@@ -1,0 +1,222 @@
+#include <a_samp>
+
+#if !defined AMX_NAME
+	#error Please #define AMX_NAME "amx_name.amx"
+#endif
+
+#if debug < 2
+	#error The debug level must be 2 or 3
+#endif
+
+#if !defined MAX_GLOBAL_VARIABLES
+	#define MAX_GLOBAL_VARIABLES 4096
+#endif
+
+#if !defined MAX_FUNCTIONS
+	#define MAX_FUNCTIONS 2048
+#endif
+
+#if !defined MAX_TAGS
+	#define MAX_TAGS 512
+#endif
+
+static const s_AmxName[] = AMX_NAME;
+
+enum {
+	IDENT_VARIABLE  = 1,
+	IDENT_REFERENCE = 2,
+	IDENT_ARRAY     = 3,
+	IDENT_REFARRAY  = 4,
+	IDENT_FUNCTION  = 9
+}
+
+enum {
+	VCLASS_GLOBAL,
+	VCLASS_LOCAL,
+	VCLASS_STATIC
+}
+
+enum E_VARIABLE {
+	Address,
+	Tag,
+	Name[32],
+	Dimensions,
+	DimensionSize[3]
+}
+
+enum E_FUNCTION {
+	Address,
+	Name[48]
+}
+
+enum E_TAG {
+	Tag,
+	Name[32]
+}
+
+static
+	s_Variables[MAX_GLOBAL_VARIABLES][E_VARIABLE],
+	s_Functions[MAX_FUNCTIONS][E_FUNCTION],
+//	s_Tags[MAX_TAGS][E_TAG],
+	
+	s_NumVariables,
+	s_NumFunctions
+//	s_NumTags
+;
+
+stock IntrospectInit() {
+	new File:fp = fopen(s_AmxName, io_read);
+	
+	if (!fp) {
+		printf("(introspect.inc) Unable to open \"%s\"", s_AmxName);
+		
+		return false;
+	}
+	
+	// Go to the end of the AMX (0 contains the size excluding debug information)
+	fseek(fp, freadcell(fp));
+	
+	new size         = freadcell(fp);
+	new magic        = freadshort(fp);
+	new file_version = freadbyte(fp);
+	new amx_version  = freadbyte(fp);
+	new flags        = freadshort(fp);
+	new num_files    = freadshort(fp);
+	new num_lines    = freadshort(fp);
+	new num_symbols  = freadshort(fp);
+	new num_tags     = freadshort(fp);
+	new num_machines = freadshort(fp);
+	new num_states   = freadshort(fp);
+	
+	#pragma unused num_states, num_machines, num_tags, flags, amx_version, file_version, magic, size
+	
+	// Skip the file table
+	for (new i = 0; i < num_files; i++) {
+		fseek(fp, 4, seek_current);
+		while (freadbyte(fp)) {}
+	}
+	
+	// Skip the line table
+	fseek(fp, num_lines * 8, seek_current);
+	
+	// Read the symbol table
+	for (new i = 0; i < num_symbols; i++) {
+		new address = freadcell(fp);
+		new tag = freadshort(fp);
+		new codestart = freadcell(fp);
+		new codeend = freadcell(fp);
+		new ident = freadbyte(fp);
+		new vclass = freadbyte(fp);
+		new dim = freadshort(fp);
+		new name[48]; freadstr(fp, name);
+		new dim_size[4];
+		
+		#pragma unused codestart, codeend
+		
+		for (new j = 0; j < dim; j++) {
+			freadshort(fp);
+			
+			dim_size[j] = freadcell(fp);
+		}
+		
+		if (vclass != VCLASS_GLOBAL) {
+			continue;
+		}
+		
+		switch (ident) {
+			case IDENT_VARIABLE,
+			     IDENT_ARRAY: {
+				s_Variables[s_NumVariables][Address] = address;
+				s_Variables[s_NumVariables][Tag] = tag;
+				s_Variables[s_NumVariables][Dimensions] = dim;
+				s_Variables[s_NumVariables][DimensionSize][0] = dim_size[0];
+				s_Variables[s_NumVariables][DimensionSize][1] = dim_size[1];
+				s_Variables[s_NumVariables][DimensionSize][2] = dim_size[2];
+				strunpack(s_Variables[s_NumVariables][Name], name, 32);
+				
+				s_NumVariables++;
+			}
+			
+			case IDENT_FUNCTION: {
+				s_Functions[s_NumFunctions][Address] = address;
+				strunpack(s_Functions[s_NumFunctions][Name], name, 48);
+				
+				s_NumFunctions++;
+			}
+		}
+	}
+	
+	
+	fclose(fp);
+	
+	return true;
+}
+
+stock GetFunctionAddress(const name[]) {
+	for (new i = 0; i < s_NumFunctions; i++) {
+		if (!strcmp(name, s_Functions[i][Name])) {
+			return s_Functions[i][Address];
+		}
+	}
+	
+	return -1;
+}
+
+stock GerVariableInfo(const name[], info[E_VARIABLE]) {
+	for (new i = 0; i < s_NumVariables; i++) {
+		if (!strcmp(name, s_Variables[i][Name])) {
+			info[Address] = s_Variables[i][Address];
+			info[Tag] = s_Variables[i][Tag];
+			info[Dimensions] = s_Variables[i][Dimensions];
+			info[DimensionSize][0] = s_Variables[i][DimensionSize][0];
+			info[DimensionSize][1] = s_Variables[i][DimensionSize][1];
+			info[DimensionSize][2] = s_Variables[i][DimensionSize][2];
+			strunpack(info[Name], s_Variables[i][Name], 32);
+			
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+// Read a single cell
+static freadcell(File:fp) {
+	new buf[1];
+	
+	fblockread(fp, buf);
+	
+	return buf[0];
+}
+
+// Read a 16-bit integer
+static freadshort(File:fp) {
+	new buf[1];
+	
+	fblockread(fp, buf);
+	fseek(fp, -2, seek_current);
+	
+	return buf[0] & 0xFFFF;
+}
+
+// Read a single byte
+static freadbyte(File:fp) {
+	return fgetchar(fp, 0, false);
+}
+
+// Read a zero-terminated string
+static freadstr(File:fp, buf[], maxlength = sizeof(buf)) {
+	new i = 0, c;
+	
+	buf[i] = '\0';
+	
+	while ((c = fgetchar(fp, 0))) {
+		if (i + 1 < maxlength) {
+			buf[i++] = c;
+		}
+	}
+	
+	buf[i] = '\0';
+	
+	return i;
+}
