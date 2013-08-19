@@ -377,6 +377,13 @@ static SkipSpaces(const buf[], &index) {
 	}
 }
 
+static GetVariableAddress(...) {
+	#emit LOAD.S.pri 12
+	#emit RETN
+	
+	return 0;
+}
+
 stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)) {
 	new sym[32], idx = 0;
 	
@@ -476,17 +483,26 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 		
 		new
 			arg[16],
+			arg_ref[16],
 			arg_type[16],
 			args = 0,
 			buf[2048],
 			buf_idx = 0,
-			buf_adr;
+			buf_adr,
+			ref = false;
 		
 		#emit ADDR.pri   buf
 		#emit STOR.S.pri buf_adr
 		
 		while (statement[idx]) {
 			SkipSpaces(statement, idx);
+			
+			if (statement[idx] == '&') {
+				ref = true;
+				idx++;
+			} else {
+				ref = false;
+			}
 			
 			switch (statement[idx]) {
 				case ')': {
@@ -506,8 +522,13 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 					}
 					
 					arg_type[args] = 's';
-					arg[args] = buf_adr + buf_idx;
-					arg[args] = buf_adr + buf_idx * 4;
+					
+					if (ref) {
+						arg_ref[args] = buf_adr + buf_idx * 4;
+						arg[args] = GetVariableAddress(arg_ref[args]);
+					} else {
+						arg[args] = buf_adr + buf_idx * 4;
+					}
 					
 					args++;
 					
@@ -524,7 +545,13 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 					}
 					
 					arg_type[args] = 'i';
-					arg[args] = value;
+					
+					if (ref) {
+						arg_ref[args] = value;
+						arg[args] = GetVariableAddress(arg_ref[args]);
+					} else {
+						arg[args] = value;
+					}
 					
 					args++;
 				}

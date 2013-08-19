@@ -39,7 +39,7 @@ main() {
 	printf("%f", g_TestFloat);
 	
 	RunSimpleStatement("SomeFunction(123, 456.678, \"hellooooo!\")");
-	RunSimpleStatement("print(\"hello\")");
+	RunSimpleStatement("printf(\"hello %s %f.\", \"world\", &12.34)");
 	RunSimpleStatement("SendRconCommand(\"echo hello from rcon!\")");
 	
 	// ---------------------------------
