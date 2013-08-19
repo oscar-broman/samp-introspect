@@ -35,8 +35,9 @@ g_SomeVariable = "string value"
 g_SomeVariable = 123456
 g_SomeVariable = 123.456
 
-// Not yet supported:
 SomeFunction(123, 456.678, "hello")
+
+// Not yet supported (native function):
 SetPlayerHealth(2, 100.0)
 ```
 
