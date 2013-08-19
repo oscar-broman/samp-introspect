@@ -1,5 +1,6 @@
 #include <a_samp>
 
+#define INTROSPECT_NATIVES
 #define AMX_NAME "introspect_demo.amx"
 #include "introspect"
 
@@ -38,6 +39,8 @@ main() {
 	printf("%f", g_TestFloat);
 	
 	RunSimpleStatement("SomeFunction(123, 456.678, \"hellooooo!\")");
+	RunSimpleStatement("print(\"hello\")");
+	RunSimpleStatement("SendRconCommand(\"echo hello from rcon!\")");
 	
 	// ---------------------------------
 	// Advanced usage

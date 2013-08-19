@@ -20,6 +20,17 @@
 	#define MAX_TAGS 512
 #endif
 
+#if defined INTROSPECT_NATIVES
+	#include "introspect-natives"
+	
+	#tryinclude "amx_assembly\dynamic_call"
+	#tryinclude "amx\dynamic_call"
+
+	#if !defined CallNative
+		#error amx_assembly is required. Get it here: github.com/Zeex/amx_assembly
+	#endif
+#endif
+
 static const s_AmxName[] = AMX_NAME;
 
 enum {
@@ -443,7 +454,19 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 	} else if (statement[idx] == '(') {
 		idx++;
 		
-		new addr = GetFunctionAddress(sym);
+		new addr = 0;
+		
+		#if defined INTROSPECT_NATIVES
+			new is_native = false;
+			
+			if (-1 != (addr = GetNativeIndexFromName(sym))) {
+				is_native = true;
+			}
+		#endif
+			
+		if (addr == -1) {
+			addr = GetFunctionAddress(sym);
+		}
 		
 		if (addr == -1) {
 			format(error, errlen, "Invalid function: %s", sym);
@@ -506,6 +529,31 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 				}
 			}
 		}
+		
+		#if defined INTROSPECT_NATIVES
+			if (is_native) {
+				new arg_bytes = 4 + args * 4;
+				
+				while (--args >= 0) {
+					#emit ADDR.pri arg
+					#emit LOAD.S.alt args
+					#emit SHL.C.alt 2
+					#emit ADD
+					#emit PUSH.pri
+				}
+				
+				#emit PUSH.S addr
+				#emit PUSH.S arg_bytes
+		
+				#emit LCTRL 6
+				#emit ADD.C 28
+				#emit PUSH.pri
+				#emit CONST.pri CallNative
+				#emit SCTRL 6
+				
+				return true;
+			}
+		#endif
 		
 		new value, arg_bytes = args * 4;
 		

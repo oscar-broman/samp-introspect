@@ -36,10 +36,13 @@ g_SomeVariable = 123456
 g_SomeVariable = 123.456
 
 SomeFunction(123, 456.678, "hello")
-
-// Not yet supported (native function):
 SetPlayerHealth(2, 100.0)
+SendRconCommand("echo hello!")
 ```
+
+### Native functions
+
+To run native functions, you must define `INTROSPECT_NATIVES` before including `introspect.inc`. You'll also need [amx_assembly](https://github.com/Zeex/amx_assembly).
 
 When that statement is executed, the function will look for a variable called `g_SomeVariable` and set its value.
 
