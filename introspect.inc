@@ -173,9 +173,35 @@ stock GetFunctionAddress(const name[]) {
 	return -1;
 }
 
-stock GerVariableInfo(const name[], info[E_VARIABLE]) {
+stock GetVariableInfo(const name[], info[E_VARIABLE]) {
+	new sym[32], idx = 0, deref = 0, deref_idx[3];
+	
+	if (!ReadSymbol(name, idx, sym)) {
+		return false;
+	}
+	
+	SkipSpaces(name, idx);
+	
+	while (name[idx] == '[' && deref < 3) {
+		new type;
+		
+		idx++, SkipSpaces(name, idx);
+		
+		if (!ReadNumber(name, idx, deref_idx[deref], type)) {
+			return false;
+		}
+		
+		SkipSpaces(name, idx);
+		
+		if (name[idx++] != ']') {
+			return false;
+		}
+		
+		deref++;
+	}
+	
 	for (new i = 0; i < s_NumVariables; i++) {
-		if (!strcmp(name, s_Variables[i][Name])) {
+		if (!strcmp(sym, s_Variables[i][Name])) {
 			info[Address] = s_Variables[i][Address];
 			info[Tag] = s_Variables[i][Tag];
 			info[Dimensions] = s_Variables[i][Dimensions];
@@ -183,6 +209,15 @@ stock GerVariableInfo(const name[], info[E_VARIABLE]) {
 			info[DimensionSize][1] = s_Variables[i][DimensionSize][1];
 			info[DimensionSize][2] = s_Variables[i][DimensionSize][2];
 			strunpack(info[Name], s_Variables[i][Name], 32);
+			
+			if (deref) {
+				info[Dimensions] -= 1;
+				info[DimensionSize][0] = info[DimensionSize][1];
+				info[DimensionSize][1] = info[DimensionSize][2];
+				info[DimensionSize][2] = 0;
+				
+				info[Address] += deref_idx[--deref] * 4;
+			}
 			
 			return true;
 		}
@@ -385,9 +420,11 @@ static GetVariableAddress(...) {
 }
 
 stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)) {
-	new sym[32], idx = 0;
+	new sym[32], idx = 0, start_idx;
 	
 	SkipSpaces(statement, idx);
+	
+	start_idx = idx;
 	
 	if (!ReadSymbol(statement, idx, sym)) {
 		strunpack(error, "Invalid symbol given", errlen);
@@ -397,10 +434,10 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 	
 	SkipSpaces(statement, idx);
 	
-	if (statement[idx] == '=') {
+	if (statement[idx] == '=' || statement[idx] == '[') {
 		new info[E_VARIABLE];
 		
-		if (!GerVariableInfo(sym, info)) {
+		if (!GetVariableInfo(statement[start_idx], info)) {
 			format(error, errlen, "Invalid variable: %s", sym);
 			
 			return false;
@@ -489,7 +526,7 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 			buf[2048],
 			buf_idx = 0,
 			buf_adr,
-			ref = false;
+			is_ref = false;
 		
 		#emit ADDR.pri   buf
 		#emit STOR.S.pri buf_adr
@@ -498,10 +535,10 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 			SkipSpaces(statement, idx);
 			
 			if (statement[idx] == '&') {
-				ref = true;
+				is_ref = true;
 				idx++;
 			} else {
-				ref = false;
+				is_ref = false;
 			}
 			
 			switch (statement[idx]) {
@@ -523,7 +560,7 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 					
 					arg_type[args] = 's';
 					
-					if (ref) {
+					if (is_ref) {
 						arg_ref[args] = buf_adr + buf_idx * 4;
 						arg[args] = GetVariableAddress(arg_ref[args]);
 					} else {
@@ -546,7 +583,7 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 					
 					arg_type[args] = 'i';
 					
-					if (ref) {
+					if (is_ref) {
 						arg_ref[args] = value;
 						arg[args] = GetVariableAddress(arg_ref[args]);
 					} else {
