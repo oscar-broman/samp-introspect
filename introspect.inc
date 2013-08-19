@@ -489,7 +489,7 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 			buf[2048],
 			buf_idx = 0,
 			buf_adr,
-			ref = false;
+			is_ref = false;
 		
 		#emit ADDR.pri   buf
 		#emit STOR.S.pri buf_adr
@@ -498,10 +498,10 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 			SkipSpaces(statement, idx);
 			
 			if (statement[idx] == '&') {
-				ref = true;
+				is_ref = true;
 				idx++;
 			} else {
-				ref = false;
+				is_ref = false;
 			}
 			
 			switch (statement[idx]) {
@@ -523,7 +523,7 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 					
 					arg_type[args] = 's';
 					
-					if (ref) {
+					if (is_ref) {
 						arg_ref[args] = buf_adr + buf_idx * 4;
 						arg[args] = GetVariableAddress(arg_ref[args]);
 					} else {
@@ -546,7 +546,7 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 					
 					arg_type[args] = 'i';
 					
-					if (ref) {
+					if (is_ref) {
 						arg_ref[args] = value;
 						arg[args] = GetVariableAddress(arg_ref[args]);
 					} else {
