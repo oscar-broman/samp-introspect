@@ -338,6 +338,10 @@ static ReadNumber(const input[], &index, &output, &type) {
 				
 				continue;
 			}
+			
+			default: {
+				break;
+			}
 		}
 	}
 	
@@ -437,11 +441,88 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 			}
 		}
 	} else if (statement[idx] == '(') {
-		idx++, SkipSpaces(statement, idx);
+		idx++;
 		
-		strunpack(error, "Function calls are not yet supported", errlen);
+		new addr = GetFunctionAddress(sym);
 		
-		return false;
+		if (addr == -1) {
+			format(error, errlen, "Invalid function: %s", sym);
+			
+			return false;
+		}
+		
+		new
+			arg[16],
+			arg_type[16],
+			args = 0,
+			buf[2048],
+			buf_idx = 0,
+			buf_adr;
+		
+		#emit ADDR.pri   buf
+		#emit STOR.S.pri buf_adr
+		
+		while (statement[idx]) {
+			SkipSpaces(statement, idx);
+			
+			switch (statement[idx]) {
+				case ')': {
+					break;
+				}
+				
+				case ',': {
+					idx++;
+					continue;
+				}
+				
+				case '"': {
+					if (!ReadString(statement, idx, buf[buf_idx], sizeof(buf) - buf_idx)) {
+						strunpack(error, "Invalid string literal", errlen);
+					
+						return false;
+					}
+					
+					arg_type[args] = 's';
+					arg[args] = buf_adr + buf_idx;
+					
+					args++;
+					
+					buf_idx += strlen(buf[buf_idx]) + 1;
+				}
+				
+				case '-', '0' .. '9': {
+					new type, value;
+				
+					if (!ReadNumber(statement, idx, value, type)) {
+						strunpack(error, "Invalid number", errlen);
+					
+						return false;
+					}
+					
+					arg_type[args] = 'i';
+					arg[args] = value;
+					
+					args++;
+				}
+			}
+		}
+		
+		new value, arg_bytes = args * 4;
+		
+		while (--args >= 0) {
+			value = arg[args];
+			#emit PUSH.S value
+		}
+		
+		#emit PUSH.S arg_bytes
+		
+		#emit LCTRL 6
+		#emit ADD.C 28
+		#emit PUSH.pri
+		#emit LOAD.S.pri addr
+		#emit SCTRL 6
+		
+		return true;
 	}
 	
 	strunpack(error, "Invalid simple statement", errlen);

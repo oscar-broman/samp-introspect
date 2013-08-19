@@ -8,11 +8,14 @@ new Float:g_LocalArray[123][456];
 
 forward _funcinc_introspect();
 public _funcinc_introspect() {
-	SomeFunction(0);
+	SomeFunction(0, 0.0, "");
 }
 
-SomeFunction(num) {
-	printf("num: %d", num);
+SomeFunction(int, Float:flt, str[]) {
+	printf("args: %d", numargs());
+	printf("int: %d", int);
+	printf("flt: %f", flt);
+	printf("str: %s", str);
 }
 
 new g_TestString[128] = "hello world";
@@ -34,13 +37,7 @@ main() {
 	RunSimpleStatement("g_TestFloat = 456.789");
 	printf("%f", g_TestFloat);
 	
-	new error[128];
-
-	if (RunSimpleStatement("SomeFunction(123)", error)) {
-	  print("The variable was modified!");
-	} else {
-	  printf("Error: %s", error);
-	}
+	RunSimpleStatement("SomeFunction(123, 456.678, \"hellooooo!\")");
 	
 	// ---------------------------------
 	// Advanced usage
