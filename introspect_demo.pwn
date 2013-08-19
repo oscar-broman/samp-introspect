@@ -53,7 +53,7 @@ main() {
 	
 	new info[E_VARIABLE];
 	
-	if (GerVariableInfo("g_LocalVariable", info)) {
+	if (GetVariableInfo("g_LocalVariable", info)) {
 		print(info[Name]);
 		printf("  Address: %08x", info[Address]);
 		printf("  Tag: %04x", info[Tag]);
@@ -63,7 +63,7 @@ main() {
 		print("Variable not found.");
 	}
 	
-	if (GerVariableInfo("g_LocalArray", info)) {
+	if (GetVariableInfo("g_LocalArray", info)) {
 		print(info[Name]);
 		printf("  Address: %08x", info[Address]);
 		printf("  Tag: %04x", info[Tag]);
@@ -87,8 +87,8 @@ main() {
 	
 	printf("%d, %d", g_TestArray[3], g_TestArray2[7][8]);
 	
-	//GerVariableInfo("g_TestArray[3]", info);
-	//GerVariableInfo("g_TestArray2[7][8]", info);
+	//GetVariableInfo("g_TestArray[3]", info);
+	//GetVariableInfo("g_TestArray2[7][8]", info);
 	
 	RunSimpleStatement("g_TestArray[3] = 5");
 	

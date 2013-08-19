@@ -173,7 +173,7 @@ stock GetFunctionAddress(const name[]) {
 	return -1;
 }
 
-stock GerVariableInfo(const name[], info[E_VARIABLE]) {
+stock GetVariableInfo(const name[], info[E_VARIABLE]) {
 	new sym[32], idx = 0, deref = 0, deref_idx[3];
 	
 	if (!ReadSymbol(name, idx, sym)) {
@@ -437,7 +437,7 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 	if (statement[idx] == '=' || statement[idx] == '[') {
 		new info[E_VARIABLE];
 		
-		if (!GerVariableInfo(statement[start_idx], info)) {
+		if (!GetVariableInfo(statement[start_idx], info)) {
 			format(error, errlen, "Invalid variable: %s", sym);
 			
 			return false;

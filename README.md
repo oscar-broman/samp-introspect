@@ -14,7 +14,7 @@ Alternatively, you can create a symbolic link to the scriptfiles directory (see 
 
 To get the address of a function, use `GetFunctionAddress(name[])`.
 
-To get information about a variable, use `GerVariableInfo(const name[], info[E_VARIABLE])`. `E_VARIABLE` is an enum with the following layout:
+To get information about a variable, use `GetVariableInfo(const name[], info[E_VARIABLE])`. `E_VARIABLE` is an enum with the following layout:
 
 ```
 enum E_VARIABLE {
