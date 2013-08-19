@@ -77,6 +77,20 @@ static
 
 stock IntrospectInit() {
 	new File:fp = fopen(s_AmxName, io_read);
+	// Try some more versions based on Y_Less' tool:
+	{
+		static const s_ServerDir[] = "DANGEROUS_SERVER_ROOT/";
+		static const s_ModeDirs[][] = {
+			"gamemodes/",
+			"filterscripts/",
+			"npcmodes/"
+		};
+		new path[64];
+		for (new i = 0; i != 6; ++i) {
+			format(path, sizeof (path), "%s%s%s", (i < 3) ? (s_ServerDir) : (""), s_ModeDirs[i % 3], s_AmxName);
+			if ((fp = fopen(path))) break;
+		}
+	}
 	
 	if (!fp) {
 		printf("(introspect.inc) Unable to open \"%s\"", s_AmxName);
@@ -642,3 +656,5 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 	
 	return false;
 }
+
+//#pragma unused GetVariableAddress, ReadString, freadbyte, freadcell, freadshort, freadstr

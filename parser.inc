@@ -1,3 +1,4 @@
+#include "introspect"
 
 #include <a_samp>
 // Tokeniser.  Read text and convert it to tokens for simple processing.
@@ -66,6 +67,7 @@ enum e_TOKEN_TYPE
 	e_TOKEN_TYPE_STRING,
 	e_TOKEN_TYPE_FLOAT,
 	// These two are distinct for simplicity.
+	e_TOKEN_TYPE_NATIVE,
 	e_TOKEN_TYPE_FUNC,
 	e_TOKEN_TYPE_VAR,
 	e_TOKEN_TYPE_NUM,
@@ -80,8 +82,8 @@ enum E_TOKEN
 	Float:E_TOKEN_FLOAT_VAL = 1,
 	bool:E_TOKEN_BOOL_VAL = 1,
 	e_TOKEN_OP:E_TOKEN_OP = 1,
-	E_TOKEN_FUNC_PTR = 1,
 	E_TOKEN_SYM_PTR = 1,
+	E_TOKEN_NATIVE_IDX = 1,
 }
 
 /******************************************************************************\
@@ -144,11 +146,11 @@ static stock Parser_PrintOp(e_TOKEN_OP:op)
 		case e_TOKEN_OP_CL_PAAMAYIM: ret = "::";
 		case e_TOKEN_OP_CL_DQUOTE: ret = "\"";
 		case e_TOKEN_OP_CL_QUOTE: ret = "\'";
-		case e_TOKEN_OP_CL_SEMICOLON = ";";
-		case e_TOKEN_OP_CL_COMMA = ",";
-		case e_TOKEN_OP_CL_POINT = ".";
-		case e_TOKEN_OP_CL_COLON = ":";
-		case e_TOKEN_OP_CL_QUESTION = "?";
+		case e_TOKEN_OP_CL_SEMICOLON: ret = ";";
+		case e_TOKEN_OP_CL_COMMA: ret = ",";
+		case e_TOKEN_OP_CL_POINT: ret = ".";
+		case e_TOKEN_OP_CL_COLON: ret = ":";
+		case e_TOKEN_OP_CL_QUESTION: ret = "?";
 		default: ret = "<none>";
 	}
 	return ret;
@@ -274,7 +276,7 @@ static stock Parser_GetNextToken(ret[E_TOKEN])
 	{
 		case '\0': return ret;
 		case '0' .. '9': Parser_GetNumber(ret);
-//		case 'a' .. 'z', 'A' .. 'Z', '_', '@': Parser_GetSymbol(ret);
+		case 'a' .. 'z', 'A' .. 'Z', '_', '@': Parser_GetSymbol(ret);
 //		case '"': Parser_GetString(ret);
 		case '\'': Parser_GetChar(ret);
 		default: Parser_GetOp(ret);
@@ -516,15 +518,6 @@ static stock Parser_GetNumber(ret[E_TOKEN])
 	return 1;
 }
 
-static stock Parser_GetSymbol()
-{
-	new
-		ret[E_TOKEN] = {e_TOKEN_TYPE_VAR, 0};
-	// Decimal (default).
-	ISI_gInputPtr = 0;
-	return ret;
-}
-
 static stock Parser_GetString()
 {
 	new
@@ -532,6 +525,62 @@ static stock Parser_GetString()
 	// Decimal (default).
 	ISI_gInputPtr = 0;
 	return ret;
+}
+
+static stock Parser_IsSymbolCharacter(ch)
+{
+	return ('0' <= ch <= '9') || ('a' <= ch <= 'z') || ('A' <= ch <= 'Z') || ch == '_' || ch == '@';
+}
+
+static stock Parser_GetSymbol(ret[E_TOKEN])
+{
+	ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NONE;
+	// Find the end of the symbol (already have the first character).
+	new
+		ptr = ISI_gInputPtr + 1;
+	while (Parser_IsSymbolCharacter(ISI_gInputLine[ptr])) ++ptr;
+	// Store the next character so we can blank it and get the symbol.
+	new
+		tmp = ISI_gInputLine[ptr];
+	ISI_gInputLine[ptr] = '\0';
+	// TODO: Add constants:
+	#if defined INTROSPECT_CONSTANTS
+		if (Parser_GetConstant(ISI_gInputLine[ISI_gInputPtr], ret))
+		{
+			// Pass it floats and integers from things like "MAX_PLAYERS".
+			goto Parser_GetSymbol_return;
+		}
+	#endif
+	// Get the variable pointer.
+	{
+		new
+			symDat[E_VARIABLE];
+		if (GetVariableInfo(ISI_gInputLine[ISI_gInputPtr], symDat))
+		{
+			ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_VAR,
+			ret[E_TOKEN_SYM_PTR] = symDat[Address];
+			goto Parser_GetSymbol_return;
+		}
+	}
+	// Get the function pointer.
+	if ((ret[E_TOKEN_SYM_PTR] = GetFunctionAddress(ISI_gInputLine[ISI_gInputPtr])) != -1)
+	{
+		ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FUNC;
+		goto Parser_GetSymbol_return;
+	}
+	// Get the native index.
+	#if defined INTROSPECT_NATIVES
+		if ((ret[E_TOKEN_NATIVE_IDX] = GetNativeIndexFromName(ISI_gInputLine[ISI_gInputPtr])) != -1)
+		{
+			ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NATIVE;
+			goto Parser_GetSymbol_return;
+		}
+	#endif
+	Parser_Error("Unknown symbol: %s", ISI_gInputLine[ISI_gInputPtr]);
+Parser_GetSymbol_return:
+	return
+		ISI_gInputLine[(ISI_gInputPtr = ptr)] = tmp,
+		1;
 }
 
 /******************************************************************************\
@@ -606,6 +655,7 @@ Parser_GetChar_no_increment:
 
 main()
 {
+	IntrospectInit();
 	print("\n-------------------------");
 	print(" Introspect parser tests");
 	print("-------------------------\n");
