@@ -507,6 +507,7 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 					
 					arg_type[args] = 's';
 					arg[args] = buf_adr + buf_idx;
+					arg[args] = buf_adr + buf_idx * 4;
 					
 					args++;
 					
