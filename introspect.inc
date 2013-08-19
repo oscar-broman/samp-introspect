@@ -220,3 +220,231 @@ static freadstr(File:fp, buf[], maxlength = sizeof(buf)) {
 	
 	return i;
 }
+
+static ReadSymbol(const input[], &index, output[], maxlength = sizeof(output)) {
+	new i = index, j = 0;
+	
+	if ('0' <= input[i] <= '9') {
+		return false;
+	}
+	
+	for (new c; (c = input[i]); i++) {
+		if (j + 1 >= maxlength) {
+			return false;
+		}
+		
+		switch (c) {
+			case 'a' .. 'z',
+			     'A' .. 'Z',
+			     '0' .. '9',
+			     '@', '_': {
+				output[j++] = c;
+				
+				continue;
+			}
+			
+			default: {
+				break;
+			}
+		}
+	}
+	
+	if (!j) {
+		return false;
+	}
+	
+	output[j] = '\0';
+	
+	index = i;
+	
+	return j;
+}
+
+static ReadString(const input[], &index, output[], maxlength = sizeof(output)) {
+	new in_esc = false, i = 0, c;
+	
+	for (index++; (c = input[index]); index++) {
+		if (i + 1 >= maxlength) {
+			break;
+		}
+		
+		if (c == '\\') {
+			if (in_esc) {
+				in_esc = false;
+				
+				output[i++] = '\\';
+			} else {
+				in_esc = true;
+			}
+		} else if (in_esc) {
+			switch (c) {
+				case '"': output[i++] = c;
+				case 'a': output[i++] = '\a';
+				case 'b': output[i++] = '\b';
+				case 'e': output[i++] = '\e';
+				case 'r': output[i++] = '\r';
+				case 'n': output[i++] = '\n';
+				case 't': output[i++] = '\t';
+				case 'v': output[i++] = '\v';
+			}
+			
+			in_esc = false;
+		} else {
+			if ( c == '"') {
+				output[i] = '\0';
+				index++;
+				
+				return true;
+			} else {
+				output[i++] = c;
+			}
+		}
+	}
+	
+	output[i] = '\0';
+	
+	return false;
+}
+
+static ReadNumber(const input[], &index, &output, &type) {
+	new i, c, had_num = false;
+	
+	type = 'i';
+	
+	for (i = index; (c = input[i]); i++) {
+		if (i == 0 && c == '-') {
+			continue;
+		}
+		
+		switch (c) {
+			case '0' .. '9': {
+				had_num = true;
+				
+				continue;
+			}
+			
+			case '.': {
+				if (!had_num) {
+					return false;
+				}
+				
+				type = 'f';
+			}
+			
+			case '-', '+', 'e': {
+				if (!had_num) {
+					return false;
+				}
+				
+				continue;
+			}
+		}
+	}
+	
+	if (!had_num) {
+		return false;
+	}
+	
+	if (type == 'f') {
+		output = _:floatstr(input[index]);
+	} else {
+		output = strval(input[index]);
+	}
+	
+	index = i;
+	
+	return true;
+}
+
+static SkipSpaces(const buf[], &index) {
+	while ('\0' < buf[index] <= ' ') {
+		index++;
+	}
+}
+
+stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)) {
+	new sym[32], idx = 0;
+	
+	SkipSpaces(statement, idx);
+	
+	if (!ReadSymbol(statement, idx, sym)) {
+		strunpack(error, "Invalid symbol given", errlen);
+		
+		return false;
+	}
+	
+	SkipSpaces(statement, idx);
+	
+	if (statement[idx] == '=') {
+		new info[E_VARIABLE];
+		
+		if (!GerVariableInfo(sym, info)) {
+			format(error, errlen, "Invalid variable: %s", sym);
+			
+			return false;
+		}
+		
+		idx++, SkipSpaces(statement, idx);
+		
+		switch (statement[idx]) {
+			case '"': {
+				new buf[512];
+				
+				if (!ReadString(statement, idx, buf)) {
+					strunpack(error, "Invalid string literal", errlen);
+					
+					return false;
+				}
+				
+				new addr = info[Address];
+				new len = info[DimensionSize][0];
+				
+				if (!len) {
+					len = sizeof(buf);
+				}{}
+				
+				#emit PUSH.S   len
+				#emit PUSH.ADR buf
+				#emit PUSH.S   addr
+				#emit PUSH.C   12
+				#emit SYSREQ.C strunpack
+				#emit STACK    16
+				
+				return true;
+			}
+			
+			case '-', '0' .. '9': {
+				new type, value;
+				
+				if (!ReadNumber(statement, idx, value, type)) {
+					strunpack(error, "Invalid number", errlen);
+					
+					return false;
+				}
+				
+				new addr = info[Address];
+				
+				#emit LOAD.S.pri value
+				#emit SREF.S.pri addr
+				
+				return true;
+			}
+			
+			default: {
+				strunpack(error, "Invalid value in assignment (expects string or number)", errlen);
+				
+				return false;
+			}
+		}
+	} else if (statement[idx] == '(') {
+		idx++, SkipSpaces(statement, idx);
+		
+		strunpack(error, "Function calls are not yet supported", errlen);
+		
+		return false;
+	}
+	
+	strunpack(error, "Invalid simple statement", errlen);
+	
+	return false;
+}
