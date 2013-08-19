@@ -53,6 +53,11 @@ enum e_TOKEN_OP
 	e_TOKEN_OP_CL_PAAMAYIM, // '::'
 	e_TOKEN_OP_CL_DQUOTE, // '"'
 	e_TOKEN_OP_CL_QUOTE, // '''
+	e_TOKEN_OP_CL_SEMICOLON, // ';'
+	e_TOKEN_OP_CL_COMMA, // ','
+	e_TOKEN_OP_CL_POINT, // '.'
+	e_TOKEN_OP_CL_COLON, // ':'
+	e_TOKEN_OP_CL_QUESTION, // '?'
 }
 
 enum e_TOKEN_TYPE
@@ -139,6 +144,11 @@ static stock Parser_PrintOp(e_TOKEN_OP:op)
 		case e_TOKEN_OP_CL_PAAMAYIM: ret = "::";
 		case e_TOKEN_OP_CL_DQUOTE: ret = "\"";
 		case e_TOKEN_OP_CL_QUOTE: ret = "\'";
+		case e_TOKEN_OP_CL_SEMICOLON = ";";
+		case e_TOKEN_OP_CL_COMMA = ",";
+		case e_TOKEN_OP_CL_POINT = ".";
+		case e_TOKEN_OP_CL_COLON = ":";
+		case e_TOKEN_OP_CL_QUESTION = "?";
 		default: ret = "<none>";
 	}
 	return ret;
@@ -232,6 +242,11 @@ static stock Parser_GetOp(ret[E_TOKEN])
 	PARSER_DO_OP_1(e_TOKEN_OP_CL_HASH, '#')
 	PARSER_DO_OP_1(e_TOKEN_OP_CL_DQUOTE, '"')
 	PARSER_DO_OP_1(e_TOKEN_OP_CL_QUOTE, '\'')
+	PARSER_DO_OP_1(e_TOKEN_OP_CL_SEMICOLON, ';')
+	PARSER_DO_OP_1(e_TOKEN_OP_CL_COMMA, ',')
+	PARSER_DO_OP_1(e_TOKEN_OP_CL_POINT, '.')
+	PARSER_DO_OP_1(e_TOKEN_OP_CL_COLON, ':')
+	PARSER_DO_OP_1(e_TOKEN_OP_CL_QUESTION, '?')
 	if (len)
 	{
 		// Found an op.
