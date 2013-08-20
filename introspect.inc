@@ -57,7 +57,9 @@ enum E_VARIABLE {
 
 enum E_FUNCTION {
 	Address,
-	Name[48]
+	Name[48],
+	Tag,
+	DimensionSize
 }
 
 enum E_TAG {
@@ -66,6 +68,7 @@ enum E_TAG {
 }
 
 static
+	s_FloatTag,
 	s_Variables[MAX_GLOBAL_VARIABLES][E_VARIABLE],
 	s_Functions[MAX_FUNCTIONS][E_FUNCTION],
 //	s_Tags[MAX_TAGS][E_TAG],
@@ -99,7 +102,7 @@ stock IntrospectInit() {
 	new num_machines = freadshort(fp);
 	new num_states   = freadshort(fp);
 	
-	#pragma unused num_states, num_machines, num_tags, flags, amx_version, file_version, magic, size
+	#pragma unused num_states, num_machines, flags, amx_version, file_version, magic, size
 	
 	// Skip the file table
 	for (new i = 0; i < num_files; i++) {
@@ -151,12 +154,22 @@ stock IntrospectInit() {
 			case IDENT_FUNCTION: {
 				s_Functions[s_NumFunctions][Address] = address;
 				strunpack(s_Functions[s_NumFunctions][Name], name, 48);
+				s_Functions[s_NumFunctions][Tag] = tag;
+				s_Functions[s_NumFunctions][DimensionSize] = dim_size[0];
 				
 				s_NumFunctions++;
 			}
 		}
 	}
 	
+	for (new i = 0; i < num_tags; i++) {
+		new tag = freadshort(fp);
+		new name[32]; freadstr(fp, name);
+		
+		if (!strcmp(name, !"Float")) {
+			s_FloatTag = i;
+		}
+	}
 	
 	fclose(fp);
 	
@@ -171,6 +184,21 @@ stock GetFunctionAddress(const name[]) {
 	}
 	
 	return -1;
+}
+
+stock GetFunctionInfo(const name[], info[E_FUNCTION]) {
+	for (new i = 0; i < s_NumFunctions; i++) {
+		if (!strcmp(name, s_Functions[i][Name])) {
+			info[Address] = s_Functions[i][Address];
+			info[Tag] = s_Functions[i][Tag];
+			info[DimensionSize] = s_Functions[i][DimensionSize];
+			strunpack(info[Name], s_Functions[i][Name], 32);
+			
+			return true;
+		}
+	}
+	
+	return false;
 }
 
 stock GetVariableInfo(const name[], info[E_VARIABLE]) {
@@ -419,8 +447,10 @@ static GetVariableAddress(...) {
 	return 0;
 }
 
-stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)) {
+stock RunSimpleStatement(const statement[], &output_type = 0, output[] = {0}, outlen = sizeof(output), error[] = "", errlen = sizeof(error)) {
 	new sym[32], idx = 0, start_idx;
+	
+	#pragma unused outlen
 	
 	SkipSpaces(statement, idx);
 	
@@ -498,7 +528,7 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 	} else if (statement[idx] == '(') {
 		idx++;
 		
-		new addr = 0;
+		new addr = 0, info[E_FUNCTION];
 		
 		#if defined INTROSPECT_NATIVES
 			new is_native = false;
@@ -508,8 +538,12 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 			}
 		#endif
 			
-		if (addr == -1) {
-			addr = GetFunctionAddress(sym);
+		if (addr == -1 && GetFunctionInfo(sym, info)) {
+			addr = info[Address];
+			
+			if (info[DimensionSize] != 0) {
+				format(error, errlen, "Functions that return arrays are not yet supported (%s)", sym);
+			}
 		}
 		
 		if (addr == -1) {
@@ -621,6 +655,7 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 		#endif
 		
 		new value, arg_bytes = args * 4;
+		new retval;
 		
 		while (--args >= 0) {
 			value = arg[args];
@@ -634,6 +669,15 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 		#emit PUSH.pri
 		#emit LOAD.S.pri addr
 		#emit SCTRL 6
+		#emit STOR.S.pri retval
+		
+		output[0] = retval;
+		
+		if (info[Tag] == s_FloatTag) {
+			output_type = 'f';
+		} else {
+			output_type = 'i';
+		}
 		
 		return true;
 	}
