@@ -84,7 +84,93 @@ enum E_TOKEN
 	e_TOKEN_OP:E_TOKEN_OP = 1,
 	E_TOKEN_SYM_PTR = 1,
 	E_TOKEN_NATIVE_IDX = 1,
+	_E_TOKEN_TEMP_STRING[32],
+	E_TOKEN_LEFT,
+	E_TOKEN_RIGHT
 }
+
+enum E_OPERATOR_DATA
+{
+	E_OPERATOR_DATA_NAME[7],
+	E_OPERATOR_DATA_PRECEDENCE, // -1 = unary only.
+}
+
+static stock const
+	ISI_gscOpData[e_TOKEN_OP:e_TOKEN_OP][E_OPERATOR_DATA] =
+		{
+			{"<none>", 0}, // e_TOKEN_OP_NONE
+			{"=", 4}, // e_TOKEN_OP_ASSIGN
+			{"==", 12}, // e_TOKEN_OP_EQUALS
+			{"<=", 14}, // e_TOKEN_OP_LTE
+			{">=", 14}, // e_TOKEN_OP_GTE
+			{"<", 14}, // e_TOKEN_OP_LESS
+			{">", 14}, // e_TOKEN_OP_GREATER
+			{"!", -1}, // e_TOKEN_OP_NOT
+			{"!=", 12}, // e_TOKEN_OP_NEQ
+			// There is no binary "~".
+			{"~", -1}, // e_TOKEN_OP_INV
+			{"~=", 4}, // e_TOKEN_OP_INV_ASS
+			{"+", 22}, // e_TOKEN_OP_ADD
+			{"+=", 4}, // e_TOKEN_OP_ADD_ASS
+			// This is the precedence for the binary operator, the unary
+			// operators all have the same precedence and are handled specially.
+			{"-", 22}, // e_TOKEN_OP_SUB
+			{"-=", 4}, // e_TOKEN_OP_SUB_ASS
+			{"*", 24}, // e_TOKEN_OP_MUL
+			{"*=", 4}, // e_TOKEN_OP_MUL_ASS
+			{"/", 24}, // e_TOKEN_OP_DIV
+			{"/=", 4}, // e_TOKEN_OP_DIV_ASS
+			{"%", 24}, // e_TOKEN_OP_MOD
+			{"%=", 4}, // e_TOKEN_OP_MOD_ASS
+			{"^", 17}, // e_TOKEN_OP_XOR
+			{"^=", 4}, // e_TOKEN_OP_XOR_ASS
+			{"&", 18}, // e_TOKEN_OP_LAND
+			{"&=", 4}, // e_TOKEN_OP_LAND_ASS
+			{"|", 16}, // e_TOKEN_OP_LOR
+			{"|=", 4}, // e_TOKEN_OP_LOR_ASS
+			{">>", 20}, // e_TOKEN_OP_RSHIFT
+			{">>=", 4}, // e_TOKEN_OP_RSHIFT_ASS
+			{">>>", 20}, // e_TOKEN_OP_SHIFT
+			{">>>=", 4}, // e_TOKEN_OP_SHIFT_ASS
+			{"<<", 20}, // e_TOKEN_OP_LSHIFT
+			{"<<=", 4}, // e_TOKEN_OP_LSHIFT_ASS
+			{"&&", 10}, // e_TOKEN_OP_AND
+			{"||", 9}, // e_TOKEN_OP_OR
+			{"(", 0}, // e_TOKEN_OP_OP_BRACKET
+			{")", 0}, // e_TOKEN_OP_CL_BRACKET
+			{"{", 0}, // e_TOKEN_OP_OP_BRACE
+			{"}", 0}, // e_TOKEN_OP_CL_BRACE
+			{"[", 0}, // e_TOKEN_OP_OP_SQUARE
+			{"]", 0}, // e_TOKEN_OP_CL_SQUARE
+			{"++", -1}, // e_TOKEN_OP_CL_INC
+			{"--", -1}, // e_TOKEN_OP_CL_DEC
+			{"...", 8}, // e_TOKEN_OP_CL_ELIPSIS
+			{"..", 26}, // e_TOKEN_OP_CL_CONCAT
+			{"#", -1}, // e_TOKEN_OP_CL_HASH
+			{"::", 0}, // e_TOKEN_OP_CL_PAAMAYIM
+			{"\"", 0}, // e_TOKEN_OP_CL_DQUOTE
+			{"'", 0}, // e_TOKEN_OP_CL_QUOTE
+			{";", 2}, // e_TOKEN_OP_CL_SEMICOLON
+			{",", 2}, // e_TOKEN_OP_CL_COMMA
+			{".", 0}, // e_TOKEN_OP_CL_POINT
+			// Here "colon" binds slightly tighter than "question mark" so that
+			// we don't need extra code to deal with ternary operators, instead
+			// we just give "?" a condition and a (true, false) pair.
+			{":", 7}, // e_TOKEN_OP_CL_COLON
+			{"?", 6}, // e_TOKEN_OP_CL_QUESTION
+	};
+
+/******************************************************************************\
+|******************************************************************************|
+|******************************************************************************|
+|******************************************************************************|
+|****                                                                      ****|
+|****                           HELPER FUNCTIONS                           ****|
+|****                                                                      ****|
+|******************************************************************************|
+|******************************************************************************|
+|******************************************************************************|
+\******************************************************************************/
 
 /******************************************************************************\
 	Parser_PrintOp
@@ -95,65 +181,28 @@ enum E_TOKEN
 static stock Parser_PrintOp(e_TOKEN_OP:op)
 {
 	new
-		ret[8];
-	switch (op)
+		none[7] = "<none>";
+	if (0 <= op < e_TOKEN_OP)
 	{
-		case e_TOKEN_OP_ASSIGN: ret = "=";
-		case e_TOKEN_OP_EQUALS: ret = "==";
-		case e_TOKEN_OP_LTE: ret = "<=";
-		case e_TOKEN_OP_GTE: ret = ">=";
-		case e_TOKEN_OP_LESS: ret = "<";
-		case e_TOKEN_OP_GREATER: ret = ">";
-		case e_TOKEN_OP_NOT: ret = "!";
-		case e_TOKEN_OP_NEQ: ret = "!=";
-		case e_TOKEN_OP_INV: ret = "~";
-		case e_TOKEN_OP_INV_ASS: ret = "~=";
-		case e_TOKEN_OP_ADD: ret = "+";
-		case e_TOKEN_OP_ADD_ASS: ret = "+=";
-		case e_TOKEN_OP_SUB: ret = "-";
-		case e_TOKEN_OP_SUB_ASS: ret = "-=";
-		case e_TOKEN_OP_MUL: ret = "*";
-		case e_TOKEN_OP_MUL_ASS: ret = "*=";
-		case e_TOKEN_OP_DIV: ret = "/";
-		case e_TOKEN_OP_DIV_ASS: ret = "/=";
-		case e_TOKEN_OP_MOD: ret = "%";
-		case e_TOKEN_OP_MOD_ASS: ret = "%=";
-		case e_TOKEN_OP_XOR: ret = "^";
-		case e_TOKEN_OP_XOR_ASS: ret = "^=";
-		case e_TOKEN_OP_LAND: ret = "&";
-		case e_TOKEN_OP_LAND_ASS: ret = "&=";
-		case e_TOKEN_OP_LOR: ret = "|";
-		case e_TOKEN_OP_LOR_ASS: ret = "|=";
-		case e_TOKEN_OP_RSHIFT: ret = ">>";
-		case e_TOKEN_OP_RSHIFT_ASS: ret = ">>=";
-		case e_TOKEN_OP_SHIFT: ret = ">>>";
-		case e_TOKEN_OP_SHIFT_ASS: ret = ">>>=";
-		case e_TOKEN_OP_LSHIFT: ret = "<<";
-		case e_TOKEN_OP_LSHIFT_ASS: ret = "<<=";
-		case e_TOKEN_OP_AND: ret = "&&";
-		case e_TOKEN_OP_OR: ret = "||";
-		case e_TOKEN_OP_OP_BRACKET: ret = "(";
-		case e_TOKEN_OP_CL_BRACKET: ret = ")";
-		case e_TOKEN_OP_OP_BRACE: ret = "{";
-		case e_TOKEN_OP_CL_BRACE: ret = "}";
-		case e_TOKEN_OP_OP_SQUARE: ret = "[";
-		case e_TOKEN_OP_CL_SQUARE: ret = "]";
-		case e_TOKEN_OP_CL_INC: ret = "++";
-		case e_TOKEN_OP_CL_DEC: ret = "--";
-		case e_TOKEN_OP_CL_ELIPSIS: ret = "...";
-		case e_TOKEN_OP_CL_CONCAT: ret = "..";
-		case e_TOKEN_OP_CL_HASH: ret = "#";
-		case e_TOKEN_OP_CL_PAAMAYIM: ret = "::";
-		case e_TOKEN_OP_CL_DQUOTE: ret = "\"";
-		case e_TOKEN_OP_CL_QUOTE: ret = "\'";
-		case e_TOKEN_OP_CL_SEMICOLON: ret = ";";
-		case e_TOKEN_OP_CL_COMMA: ret = ",";
-		case e_TOKEN_OP_CL_POINT: ret = ".";
-		case e_TOKEN_OP_CL_COLON: ret = ":";
-		case e_TOKEN_OP_CL_QUESTION: ret = "?";
-		default: ret = "<none>";
+		return ISI_gscOpData[op][E_OPERATOR_DATA_NAME];
 	}
-	return ret;
+	return none;
+}
+
+static stock Parser_Print(token[E_TOKEN], ret[], len = sizeof (ret))
+{
+	switch (token[E_TOKEN_TYPE])
+	{
+		case e_TOKEN_TYPE_STRING: format(ret, len, "STRING:   %s", token[_E_TOKEN_TEMP_STRING]);
+		case e_TOKEN_TYPE_FLOAT:  format(ret, len, "FLOAT:    %.2f", token[E_TOKEN_FLOAT_VAL]);
+		case e_TOKEN_TYPE_NATIVE: format(ret, len, "NATIVE:   %s", token[_E_TOKEN_TEMP_STRING]);
+		case e_TOKEN_TYPE_FUNC:   format(ret, len, "FUNCTION: %s", token[_E_TOKEN_TEMP_STRING]);
+		case e_TOKEN_TYPE_VAR:    format(ret, len, "VARIABLE: %s", token[_E_TOKEN_TEMP_STRING]);
+		case e_TOKEN_TYPE_NUM:    format(ret, len, "NUMBER:   %d", token[E_TOKEN_NUM_VAL]);
+		case e_TOKEN_TYPE_BOOL:   format(ret, len, "BOOLEAN:  %s", (token[E_TOKEN_BOOL_VAL]) ? ("true") : ("false"));
+		case e_TOKEN_TYPE_OP:     format(ret, len, "OPERATOR: %s", Parser_PrintOp(token[E_TOKEN_OP]));
+		default: ret[0] = '\0', strcat(ret, "<unknown>", len);
+	}
 }
 
 #define Parser_Error(%0) printf("PARSER ERROR: " %0)
@@ -163,13 +212,21 @@ static stock
 	ISI_gInputLen,
 	ISI_gInputPtr;
 
-static stock Parser_GetSymType(const name[], &e_TOKEN_TYPE:t, &ptr)
-{
-}
-
-static stock Parser_Peek()
+static stock Parser_PeekChar()
 {
 	return ISI_gInputLine[ISI_gInputPtr];
+}
+
+static stock e_TOKEN_TYPE:Parser_PeekToken()
+{
+	// Find out what the next token is, then backtrack to the start of it.
+	new
+		ret[E_TOKEN],
+		ptr = ISI_gInputPtr;
+	if (!Parser_GetNextToken(ret)) return e_TOKEN_TYPE_NONE;
+	return
+		ISI_gInputPtr = ptr,
+		ret[E_TOKEN_TYPE];
 }
 
 #define Parser_IsWhitespace((%0)) ('\0' <= (%0) <= ' ')
@@ -179,6 +236,18 @@ static stock Parser_SkipWhitespace()
 	while ('\0' < ISI_gInputLine[ISI_gInputPtr] <= ' ') ++ISI_gInputPtr;
 }
 
+/******************************************************************************\
+|******************************************************************************|
+|******************************************************************************|
+|******************************************************************************|
+|****                                                                      ****|
+|****                              TOKENISER                               ****|
+|****                                                                      ****|
+|******************************************************************************|
+|******************************************************************************|
+|******************************************************************************|
+\******************************************************************************/
+
 #define PARSER_DO_OP_1(%9,%0)          else if (p0 == %0) ret[E_TOKEN_OP] = (%9), len = 1;
 #define PARSER_DO_OP_2(%9,%0,%1)       else if (p0 == %0 && p1 == %1) ret[E_TOKEN_OP] = (%9), len = 2;
 #define PARSER_DO_OP_3(%9,%0,%1,%2)    else if (p0 == %0 && p1 == %1 && p2 == %2) ret[E_TOKEN_OP] = (%9), len = 3;
@@ -186,16 +255,16 @@ static stock Parser_SkipWhitespace()
 
 static stock Parser_GetOp(ret[E_TOKEN])
 {
+	// Should really use a "trie" here, but don't - too complex for now.
 	ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_OP;
 	new
 		len, // = ISI_gInputLen - ISI_gInputPtr,
 		p0, p1, p2, p3;
-	if ((p0 = ISI_gInputLine[ISI_gInputPtr + 0])
-		&& (p1 = ISI_gInputLine[ISI_gInputPtr + 1])
-			&& (p2 = ISI_gInputLine[ISI_gInputPtr + 2]))
-				p3 = ISI_gInputLine[ISI_gInputPtr + 3];
-	// Should really use a "trie" here, but don't - too complex for now.
-	if (len) return ret; // Placeholder "if" - leave it!
+	// Very special if - uses short-circuiting to always fail eventually...
+	if ((p0 = ISI_gInputLine[ISI_gInputPtr + 0]) &&
+		(p1 = ISI_gInputLine[ISI_gInputPtr + 1]) &&
+		(p2 = ISI_gInputLine[ISI_gInputPtr + 2]) &&
+		(p3 = ISI_gInputLine[ISI_gInputPtr + 3]) && len) {}
 	PARSER_DO_OP_4(e_TOKEN_OP_SHIFT_ASS, '>', '>', '>', '=')
 	PARSER_DO_OP_3(e_TOKEN_OP_RSHIFT_ASS, '>', '>', '=')
 	PARSER_DO_OP_3(e_TOKEN_OP_SHIFT, '>', '>', '>')
@@ -272,16 +341,16 @@ static stock Parser_GetNextToken(ret[E_TOKEN])
 {
 	ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NONE,
 	Parser_SkipWhitespace();
-	switch (Parser_Peek())
+	switch (Parser_PeekChar())
 	{
-		case '\0': return ret;
+		case '\0': return 0;
 		case '0' .. '9': Parser_GetNumber(ret);
 		case 'a' .. 'z', 'A' .. 'Z', '_', '@': Parser_GetSymbol(ret);
-//		case '"': Parser_GetString(ret);
+		case '"': Parser_GetString(ret);
 		case '\'': Parser_GetChar(ret);
 		default: Parser_GetOp(ret);
 	}
-	return ret;
+	return 1;
 }
 
 static stock Parser_GetHex(ch)
@@ -363,9 +432,10 @@ static stock Parser_DoBinary(ret[E_TOKEN])
 	}
 	//new
 	//	ret[E_TOKEN] = {e_TOKEN_TYPE_NUM, 0};
-	ret[E_TOKEN_NUM_VAL] = num;
-	ISI_gInputPtr = ptr;
-	return 1;
+	return
+		ret[E_TOKEN_NUM_VAL] = num,
+		ISI_gInputPtr = ptr,
+		1;
 }
 
 static stock Parser_GetOctal(ch)
@@ -390,9 +460,10 @@ static stock Parser_DoOctal(ret[E_TOKEN])
 	}
 	//new
 	//	ret[E_TOKEN] = {e_TOKEN_TYPE_NUM, 0};
-	ret[E_TOKEN_NUM_VAL] = num;
-	ISI_gInputPtr = ptr;
-	return 1;
+	return
+		ret[E_TOKEN_NUM_VAL] = num,
+		ISI_gInputPtr = ptr,
+		1;
 }
 
 /******************************************************************************\
@@ -407,7 +478,7 @@ static stock Float:Parser_Pow10(Float:n, e)
 		Float:scPow[] = {1.0, 10.0, 100.0, 1000.0, 10000.0, 100000.0, 1000000.0};
 	while (e > 0)
 	{
-		n *= scPow[e % sizeof (scPow)];
+		n *= scPow[e % sizeof (scPow)],
 		e -= sizeof (scPow);
 	}
 	return n;
@@ -450,9 +521,10 @@ static stock Parser_DoFloat(ret[E_TOKEN])
 	//
 	//  4.6e6 == 4600000 == 4, 6, 6
 	//
-	ret[E_TOKEN_FLOAT_VAL] = Parser_Pow10(float(parts[0]) + float(parts[1]) / Parser_Pow10(1.0, dp), parts[2]);
-	ISI_gInputPtr = ptr;
-	return 1;
+	return
+		ret[E_TOKEN_FLOAT_VAL] = Parser_Pow10(float(parts[0]) + float(parts[1]) / Parser_Pow10(1.0, dp), parts[2]),
+		ISI_gInputPtr = ptr,
+		1;
 }
 
 /******************************************************************************\
@@ -512,19 +584,32 @@ static stock Parser_GetNumber(ret[E_TOKEN])
 			}
 		}
 	}
-	ret[E_TOKEN_NUM_VAL] = num;
-	// Decimal (default).
-	ISI_gInputPtr = ptr;
-	return 1;
+	return
+		ret[E_TOKEN_NUM_VAL] = num,
+		// Decimal (default).
+		ISI_gInputPtr = ptr,
+		1;
 }
 
-static stock Parser_GetString()
+static stock Parser_GetString(ret[E_TOKEN])
 {
 	new
-		ret[E_TOKEN] = {e_TOKEN_TYPE_STRING, 0};
-	// Decimal (default).
-	ISI_gInputPtr = 0;
-	return ret;
+		n = -1;
+	ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_STRING,
+	++ISI_gInputPtr;
+	while (ISI_gInputLine[ISI_gInputPtr] != '\"')
+	{
+		if (ISI_gInputLine[ISI_gInputPtr]) ret[_E_TOKEN_TEMP_STRING][++n] = Parser_DoChar();
+		else
+		{
+			return Parser_Error("Unclosed string literal.");
+		}
+	}
+	return
+		ret[_E_TOKEN_TEMP_STRING][++n] = '\0',
+		// Decimal (default).
+		++ISI_gInputPtr,
+		1;
 }
 
 static stock Parser_IsSymbolCharacter(ch)
@@ -544,7 +629,7 @@ static stock Parser_GetSymbol(ret[E_TOKEN])
 		tmp = ISI_gInputLine[ptr];
 	ISI_gInputLine[ptr] = '\0';
 	// TODO: Add constants:
-	#if defined INTROSPECT_CONSTANTS
+/*	#if defined INTROSPECT_CONSTANTS
 		if (Parser_GetConstant(ISI_gInputLine[ISI_gInputPtr], ret))
 		{
 			// Pass it floats and integers from things like "MAX_PLAYERS".
@@ -577,8 +662,12 @@ static stock Parser_GetSymbol(ret[E_TOKEN])
 		}
 	#endif
 	Parser_Error("Unknown symbol: %s", ISI_gInputLine[ISI_gInputPtr]);
-Parser_GetSymbol_return:
+Parser_GetSymbol_return:*/
 	return
+		ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_VAR,
+		ret[_E_TOKEN_TEMP_STRING][0] = '\0',
+		strcat(ret[_E_TOKEN_TEMP_STRING], ISI_gInputLine[ISI_gInputPtr], 32),
+		//strcpy(ret[_E_TOKEN_TEMP_STRING], ISI_gInputLine[ISI_gInputPtr], 32),
 		ISI_gInputLine[(ISI_gInputPtr = ptr)] = tmp,
 		1;
 }
@@ -590,57 +679,172 @@ Parser_GetSymbol_return:
 	various escape sequences, decimals, and hex numbers.
 
 \******************************************************************************/
-static stock Parser_GetChar(ret[E_TOKEN])
+static stock Parser_DoChar()
 {
-	ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NUM;
+	//ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NUM;
 	new
-		ch;
-	switch ((ch = ISI_gInputLine[++ISI_gInputPtr]))
+		ch,
+		ret[E_TOKEN];
+	switch ((ch = ISI_gInputLine[ISI_gInputPtr++]))
 	{
 		case '\\':
 		{
-			switch (ISI_gInputLine[++ISI_gInputPtr])
+			switch (ISI_gInputLine[ISI_gInputPtr++])
 			{
-				case '\0':
-				{
-					return Parser_Error("Unclosed character literal.");
-				}
-				case 'n': ret[E_TOKEN_NUM_VAL] = '\n';
-				case '\\': ret[E_TOKEN_NUM_VAL] = '\\';
-				case '\'': ret[E_TOKEN_NUM_VAL] = '\'';
-				case 't': ret[E_TOKEN_NUM_VAL] = '\t';
-				case '"': ret[E_TOKEN_NUM_VAL] = '\"';
-				case 'a': ret[E_TOKEN_NUM_VAL] = '\a';
-				case 'b': ret[E_TOKEN_NUM_VAL] = '\b';
-				case 'v': ret[E_TOKEN_NUM_VAL] = '\v';
-				case 'r': ret[E_TOKEN_NUM_VAL] = '\r';
+				case '\0': return Parser_Error("Invalid escape sequence.");
+				case 'n':  return '\n';
+				case '\\': return '\\';
+				case '\'': return '\'';
+				case 't':  return '\t';
+				case '"':  return '\"';
+				case 'a':  return '\a';
+				case 'b':  return '\b';
+				case 'v':  return '\v';
+				case 'r':  return '\r';
 				case '0' .. '9':
 				{
+					--ISI_gInputPtr,
 					Parser_DoDecimal(ret);
-					if (ISI_gInputLine[ISI_gInputPtr] != ';') goto Parser_GetChar_no_increment;
+					if (ISI_gInputLine[ISI_gInputPtr] == ';') ++ISI_gInputPtr;
 				}
 				case 'x', 'X':
 				{
-					ISI_gInputPtr -= 1,
+					ISI_gInputPtr -= 2,
 					Parser_DoHex(ret);
-					if (ISI_gInputLine[ISI_gInputPtr] != ';') goto Parser_GetChar_no_increment;
+					if (ISI_gInputLine[ISI_gInputPtr] == ';') ++ISI_gInputPtr;
 				}
 			}
 		}
-		case '\0':
+		default: return ch;
+	}
+	return ret[E_TOKEN_NUM_VAL];
+}
+
+static stock Parser_GetChar(ret[E_TOKEN])
+{
+	++ISI_gInputPtr,
+	ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NUM,
+	ret[E_TOKEN_NUM_VAL] = Parser_DoChar();
+	if (ISI_gInputLine[ISI_gInputPtr] != '\'') return Parser_Error("Unclosed character literal.");
+	return
+		++ISI_gInputPtr,
+		1;
+}
+
+/******************************************************************************\
+|******************************************************************************|
+|******************************************************************************|
+|******************************************************************************|
+|****                                                                      ****|
+|****                                PARSER                                ****|
+|****                                                                      ****|
+|******************************************************************************|
+|******************************************************************************|
+|******************************************************************************|
+\******************************************************************************/
+
+static stock Parser_GetLeft(prec)
+{
+	new
+		token[E_TOKEN];
+	Parser_GetNextToken(token);
+	switch (token[E_TOKEN_TYPE])
+	{
+		case e_TOKEN_TYPE_OP:
 		{
-			return Parser_Error("Unclosed character literal.");
+			switch (token[E_TOKEN_OP]):
+			{
+				case
+					e_TOKEN_OP_OP_BRACKET:
+				{
+					// Start of a new bracketed set.
+					new
+						t2[E_TOKEN];
+					Parser_BuildTree(0);
+					Parser_GetNextToken(t2);
+					if (t2[E_TOKEN_TYPE] != e_TOKEN_TYPE_OP || t2[E_TOKEN_OP] != e_TOKEN_OP_CL_BRACKET)
+					{
+						new
+							pp[32];
+						Parser_Print(t2, pp);
+						return Parser_Error("Expected token \")\", but found: %s", pp);
+					}
+				}
+				case
+					e_TOKEN_OP_OP_BRACE:
+				{
+					// Start of a new bracketed set.
+					new
+						t2[E_TOKEN];
+					Parser_BuildTree(0);
+					Parser_GetNextToken(t2);
+					if (t2[E_TOKEN_TYPE] != e_TOKEN_TYPE_OP || t2[E_TOKEN_OP] != e_TOKEN_OP_CL_BRACE)
+					{
+						new
+							pp[32];
+						Parser_Print(t2, pp);
+						return Parser_Error("Expected token \")\", but found: %s", pp);
+					}
+				}
+				case
+					e_TOKEN_OP_OP_SQUARE:
+				{
+					// Start of a new bracketed set.
+					new
+						t2[E_TOKEN];
+					Parser_BuildTree(0);
+					Parser_GetNextToken(t2);
+					if (t2[E_TOKEN_TYPE] != e_TOKEN_TYPE_OP || t2[E_TOKEN_OP] != e_TOKEN_OP_CL_SQUARE)
+					{
+						new
+							pp[32];
+						Parser_Print(t2, pp);
+						return Parser_Error("Expected token \")\", but found: %s", pp);
+					}
+				}
+				case
+					e_TOKEN_OP_NOT,
+					e_TOKEN_OP_INV,
+					e_TOKEN_OP_ADD,
+					e_TOKEN_OP_SUB,
+					e_TOKEN_OP_CL_INC,
+					e_TOKEN_OP_CL_DEC,
+					e_TOKEN_OP_CL_HASH:
+				{
+					token[E_TOKEN_LEFT] = -1;
+					token[E_TOKEN_RIGHT] = Parser_BuildTree(prec);
+				}
+				default: return Parser_Error("Expected value, found %s", Parser_PrintOp(token[E_TOKEN_OP]));
+			}
 		}
 		default:
 		{
-			ret[E_TOKEN_NUM_VAL] = ch;
+			token[E_TOKEN_LEFT] = -1;
+			token[E_TOKEN_RIGHT] = -1;
 		}
 	}
-	++ISI_gInputPtr;
-Parser_GetChar_no_increment:
-	if (ISI_gInputLine[ISI_gInputPtr] != '\'') return Parser_Error("Unclosed character literal.");
-	return 1;
+	return token;
 }
+
+static stock Parser_GetRight(prec)
+{
+}
+
+static stock Parser_BuildTree(prec)
+{
+}
+
+/******************************************************************************\
+|******************************************************************************|
+|******************************************************************************|
+|******************************************************************************|
+|****                                                                      ****|
+|****                                TESTS                                 ****|
+|****                                                                      ****|
+|******************************************************************************|
+|******************************************************************************|
+|******************************************************************************|
+\******************************************************************************/
 
 #if defined INTROSPECT_PARSER_TEST
 
@@ -733,6 +937,17 @@ main()
 	TEST_OP("..");
 	TEST_OP("#");
 	TEST_OP("::");
+	
+	ISI_gInputLine = "34 0x55 7.7 \"Hello \\\"there\\\"\" 'a' MyFuncSymbol",
+	ISI_gInputPtr = 0;
+	new str[32];
+	while (Parser_GetNextToken(ret))
+	{
+		Parser_Print(ret, str);
+		print(str);
+	}
+	
+	
 	//TEST_OP("\"");
 	//TEST_OP("\'");
 	/*ISI_gInputLine = "70 5.5 0800 0100 0x345 0b11 0.888 0.888e3";
