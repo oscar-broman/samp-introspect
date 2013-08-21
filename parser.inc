@@ -46,19 +46,19 @@ enum e_TOKEN_OP
 	e_TOKEN_OP_CL_BRACE, // '}'
 	e_TOKEN_OP_OP_SQUARE, // '['
 	e_TOKEN_OP_CL_SQUARE, // ']'
-	e_TOKEN_OP_CL_INC, // '++'
-	e_TOKEN_OP_CL_DEC, // '--'
-	e_TOKEN_OP_CL_ELIPSIS, // '...'
-	e_TOKEN_OP_CL_CONCAT, // '..'
-	e_TOKEN_OP_CL_HASH, // '#'
-	e_TOKEN_OP_CL_PAAMAYIM, // '::'
-	e_TOKEN_OP_CL_DQUOTE, // '"'
-	e_TOKEN_OP_CL_QUOTE, // '''
-	e_TOKEN_OP_CL_SEMICOLON, // ';'
-	e_TOKEN_OP_CL_COMMA, // ','
-	e_TOKEN_OP_CL_POINT, // '.'
-	e_TOKEN_OP_CL_COLON, // ':'
-	e_TOKEN_OP_CL_QUESTION, // '?'
+	e_TOKEN_OP_INC, // '++'
+	e_TOKEN_OP_DEC, // '--'
+	e_TOKEN_OP_ELIPSIS, // '...'
+	e_TOKEN_OP_CONCAT, // '..'
+	e_TOKEN_OP_HASH, // '#'
+	e_TOKEN_OP_PAAMAYIM, // '::'
+	e_TOKEN_OP_DQUOTE, // '"'
+	e_TOKEN_OP_QUOTE, // '''
+	e_TOKEN_OP_SEMICOLON, // ';'
+	e_TOKEN_OP_COMMA, // ','
+	e_TOKEN_OP_POINT, // '.'
+	e_TOKEN_OP_COLON, // ':'
+	e_TOKEN_OP_QUESTION // '?'
 }
 
 enum e_TOKEN_TYPE
@@ -73,6 +73,8 @@ enum e_TOKEN_TYPE
 	e_TOKEN_TYPE_NUM,
 	e_TOKEN_TYPE_BOOL,
 	e_TOKEN_TYPE_OP,
+	e_TOKEN_TYPE_APP,
+	e_TOKEN_TYPE_ARR
 }
 
 enum E_TOKEN
@@ -84,19 +86,19 @@ enum E_TOKEN
 	e_TOKEN_OP:E_TOKEN_OP = 1,
 	E_TOKEN_SYM_PTR = 1,
 	E_TOKEN_NATIVE_IDX = 1,
-	_E_TOKEN_TEMP_STRING[32],
 	E_TOKEN_LEFT,
-	E_TOKEN_RIGHT
+	E_TOKEN_RIGHT,
+	_E_TOKEN_TEMP_STRING[32]
 }
 
 enum E_OPERATOR_DATA
 {
 	E_OPERATOR_DATA_NAME[7],
-	E_OPERATOR_DATA_PRECEDENCE, // -1 = unary only.
+	E_OPERATOR_DATA_PRECEDENCE // -1 = unary only.
 }
 
 static stock const
-	ISI_gscOpData[e_TOKEN_OP:e_TOKEN_OP][E_OPERATOR_DATA] =
+	ISI_gscOpData[][E_OPERATOR_DATA] =
 		{
 			{"<none>", 0}, // e_TOKEN_OP_NONE
 			{"=", 4}, // e_TOKEN_OP_ASSIGN
@@ -142,22 +144,22 @@ static stock const
 			{"}", 0}, // e_TOKEN_OP_CL_BRACE
 			{"[", 0}, // e_TOKEN_OP_OP_SQUARE
 			{"]", 0}, // e_TOKEN_OP_CL_SQUARE
-			{"++", -1}, // e_TOKEN_OP_CL_INC
-			{"--", -1}, // e_TOKEN_OP_CL_DEC
-			{"...", 8}, // e_TOKEN_OP_CL_ELIPSIS
-			{"..", 26}, // e_TOKEN_OP_CL_CONCAT
-			{"#", -1}, // e_TOKEN_OP_CL_HASH
-			{"::", 0}, // e_TOKEN_OP_CL_PAAMAYIM
-			{"\"", 0}, // e_TOKEN_OP_CL_DQUOTE
-			{"'", 0}, // e_TOKEN_OP_CL_QUOTE
-			{";", 2}, // e_TOKEN_OP_CL_SEMICOLON
-			{",", 2}, // e_TOKEN_OP_CL_COMMA
-			{".", 0}, // e_TOKEN_OP_CL_POINT
+			{"++", -1}, // e_TOKEN_OP_INC
+			{"--", -1}, // e_TOKEN_OP_DEC
+			{"...", 8}, // e_TOKEN_OP_ELIPSIS
+			{"..", 26}, // e_TOKEN_OP_CONCAT
+			{"#", -1}, // e_TOKEN_OP_HASH
+			{"::", 0}, // e_TOKEN_OP_PAAMAYIM
+			{"\"", 0}, // e_TOKEN_OP_DQUOTE
+			{"'", 0}, // e_TOKEN_OP_QUOTE
+			{";", 2}, // e_TOKEN_OP_SEMICOLON
+			{",", 2}, // e_TOKEN_OP_COMMA
+			{".", 0}, // e_TOKEN_OP_POINT
 			// Here "colon" binds slightly tighter than "question mark" so that
 			// we don't need extra code to deal with ternary operators, instead
 			// we just give "?" a condition and a (true, false) pair.
-			{":", 7}, // e_TOKEN_OP_CL_COLON
-			{"?", 6}, // e_TOKEN_OP_CL_QUESTION
+			{":", 7}, // e_TOKEN_OP_COLON
+			{"?", 6} // e_TOKEN_OP_QUESTION
 	};
 
 /******************************************************************************\
@@ -181,10 +183,15 @@ static stock const
 static stock Parser_PrintOp(e_TOKEN_OP:op)
 {
 	new
-		none[7] = "<none>";
-	if (0 <= op < e_TOKEN_OP)
+		none[7];// = "<none>";
+	if (e_TOKEN_OP_NONE <= op < e_TOKEN_OP)
+	//if (0 <= _:op < sizeof (ISI_gscOpData))
 	{
-		return ISI_gscOpData[op][E_OPERATOR_DATA_NAME];
+		strcat(none, ISI_gscOpData[op][E_OPERATOR_DATA_NAME], 7);
+	}
+	else
+	{
+		none = "<none>";
 	}
 	return none;
 }
@@ -205,28 +212,37 @@ static stock Parser_Print(token[E_TOKEN], ret[], len = sizeof (ret))
 	}
 }
 
+static stock PP(token[E_TOKEN])
+{
+	new str[32];
+	Parser_Print(token, str);
+	print(str);
+}
+
 #define Parser_Error(%0) printf("PARSER ERROR: " %0)
 
 static stock
 	ISI_gInputLine[512],
 	ISI_gInputLen,
-	ISI_gInputPtr;
+	ISI_gInputPtr,
+	ISI_gParsePos,
+	ISI_gParseTree[512][E_TOKEN];
 
 static stock Parser_PeekChar()
 {
 	return ISI_gInputLine[ISI_gInputPtr];
 }
 
-static stock e_TOKEN_TYPE:Parser_PeekToken()
+static stock Parser_PeekToken()
 {
 	// Find out what the next token is, then backtrack to the start of it.
 	new
-		ret[E_TOKEN],
+		ret[E_TOKEN] = {e_TOKEN_TYPE_NONE, 0, -1, -1, ""},
 		ptr = ISI_gInputPtr;
-	if (!Parser_GetNextToken(ret)) return e_TOKEN_TYPE_NONE;
+	if (!Parser_GetNextToken(ret)) return ret;
 	return
 		ISI_gInputPtr = ptr,
-		ret[E_TOKEN_TYPE];
+		ret;
 }
 
 #define Parser_IsWhitespace((%0)) ('\0' <= (%0) <= ' ')
@@ -269,7 +285,7 @@ static stock Parser_GetOp(ret[E_TOKEN])
 	PARSER_DO_OP_3(e_TOKEN_OP_RSHIFT_ASS, '>', '>', '=')
 	PARSER_DO_OP_3(e_TOKEN_OP_SHIFT, '>', '>', '>')
 	PARSER_DO_OP_3(e_TOKEN_OP_LSHIFT_ASS, '<', '<', '=')
-	PARSER_DO_OP_3(e_TOKEN_OP_CL_ELIPSIS, '.', '.', '.')
+	PARSER_DO_OP_3(e_TOKEN_OP_ELIPSIS, '.', '.', '.')
 	PARSER_DO_OP_2(e_TOKEN_OP_EQUALS, '=', '=')
 	PARSER_DO_OP_2(e_TOKEN_OP_LTE, '<', '=')
 	PARSER_DO_OP_2(e_TOKEN_OP_GTE, '>', '=')
@@ -287,10 +303,10 @@ static stock Parser_GetOp(ret[E_TOKEN])
 	PARSER_DO_OP_2(e_TOKEN_OP_LSHIFT, '<', '<')
 	PARSER_DO_OP_2(e_TOKEN_OP_AND, '&', '&')
 	PARSER_DO_OP_2(e_TOKEN_OP_OR, '|', '|')
-	PARSER_DO_OP_2(e_TOKEN_OP_CL_PAAMAYIM, ':', ':')
-	PARSER_DO_OP_2(e_TOKEN_OP_CL_INC, '+', '+')
-	PARSER_DO_OP_2(e_TOKEN_OP_CL_DEC, '-', '-')
-	PARSER_DO_OP_2(e_TOKEN_OP_CL_CONCAT, '.', '.')
+	PARSER_DO_OP_2(e_TOKEN_OP_PAAMAYIM, ':', ':')
+	PARSER_DO_OP_2(e_TOKEN_OP_INC, '+', '+')
+	PARSER_DO_OP_2(e_TOKEN_OP_DEC, '-', '-')
+	PARSER_DO_OP_2(e_TOKEN_OP_CONCAT, '.', '.')
 	PARSER_DO_OP_1(e_TOKEN_OP_ASSIGN, '=')
 	PARSER_DO_OP_1(e_TOKEN_OP_LESS, '<')
 	PARSER_DO_OP_1(e_TOKEN_OP_GREATER, '>')
@@ -310,14 +326,14 @@ static stock Parser_GetOp(ret[E_TOKEN])
 	PARSER_DO_OP_1(e_TOKEN_OP_CL_BRACE, '}')
 	PARSER_DO_OP_1(e_TOKEN_OP_OP_SQUARE, '[')
 	PARSER_DO_OP_1(e_TOKEN_OP_CL_SQUARE, ']')
-	PARSER_DO_OP_1(e_TOKEN_OP_CL_HASH, '#')
-	PARSER_DO_OP_1(e_TOKEN_OP_CL_DQUOTE, '"')
-	PARSER_DO_OP_1(e_TOKEN_OP_CL_QUOTE, '\'')
-	PARSER_DO_OP_1(e_TOKEN_OP_CL_SEMICOLON, ';')
-	PARSER_DO_OP_1(e_TOKEN_OP_CL_COMMA, ',')
-	PARSER_DO_OP_1(e_TOKEN_OP_CL_POINT, '.')
-	PARSER_DO_OP_1(e_TOKEN_OP_CL_COLON, ':')
-	PARSER_DO_OP_1(e_TOKEN_OP_CL_QUESTION, '?')
+	PARSER_DO_OP_1(e_TOKEN_OP_HASH, '#')
+	PARSER_DO_OP_1(e_TOKEN_OP_DQUOTE, '"')
+	PARSER_DO_OP_1(e_TOKEN_OP_QUOTE, '\'')
+	PARSER_DO_OP_1(e_TOKEN_OP_SEMICOLON, ';')
+	PARSER_DO_OP_1(e_TOKEN_OP_COMMA, ',')
+	PARSER_DO_OP_1(e_TOKEN_OP_POINT, '.')
+	PARSER_DO_OP_1(e_TOKEN_OP_COLON, ':')
+	PARSER_DO_OP_1(e_TOKEN_OP_QUESTION, '?')
 	if (len)
 	{
 		// Found an op.
@@ -746,27 +762,27 @@ static stock Parser_GetChar(ret[E_TOKEN])
 static stock Parser_GetLeft(prec)
 {
 	new
-		token[E_TOKEN];
+		token[E_TOKEN] = {e_TOKEN_TYPE_NONE, 0, -1, -1, ""},
+		pos = ISI_gParsePos;
+	if (pos >= sizeof (ISI_gParseTree)) return Parser_Error("Parse Tree full.");
 	Parser_GetNextToken(token);
 	switch (token[E_TOKEN_TYPE])
 	{
 		case e_TOKEN_TYPE_OP:
 		{
-			switch (token[E_TOKEN_OP]):
+			switch (token[E_TOKEN_OP])
 			{
 				case
 					e_TOKEN_OP_OP_BRACKET:
 				{
 					// Start of a new bracketed set.
-					new
-						t2[E_TOKEN];
-					Parser_BuildTree(0);
-					Parser_GetNextToken(t2);
-					if (t2[E_TOKEN_TYPE] != e_TOKEN_TYPE_OP || t2[E_TOKEN_OP] != e_TOKEN_OP_CL_BRACKET)
+					pos = Parser_BuildTree(0);
+					Parser_GetNextToken(token);
+					if (token[E_TOKEN_TYPE] != e_TOKEN_TYPE_OP || token[E_TOKEN_OP] != e_TOKEN_OP_CL_BRACKET)
 					{
 						new
 							pp[32];
-						Parser_Print(t2, pp);
+						Parser_Print(token, pp);
 						return Parser_Error("Expected token \")\", but found: %s", pp);
 					}
 				}
@@ -774,15 +790,13 @@ static stock Parser_GetLeft(prec)
 					e_TOKEN_OP_OP_BRACE:
 				{
 					// Start of a new bracketed set.
-					new
-						t2[E_TOKEN];
-					Parser_BuildTree(0);
-					Parser_GetNextToken(t2);
-					if (t2[E_TOKEN_TYPE] != e_TOKEN_TYPE_OP || t2[E_TOKEN_OP] != e_TOKEN_OP_CL_BRACE)
+					pos = Parser_BuildTree(0);
+					Parser_GetNextToken(token);
+					if (token[E_TOKEN_TYPE] != e_TOKEN_TYPE_OP || token[E_TOKEN_OP] != e_TOKEN_OP_CL_BRACE)
 					{
 						new
 							pp[32];
-						Parser_Print(t2, pp);
+						Parser_Print(token, pp);
 						return Parser_Error("Expected token \")\", but found: %s", pp);
 					}
 				}
@@ -790,15 +804,13 @@ static stock Parser_GetLeft(prec)
 					e_TOKEN_OP_OP_SQUARE:
 				{
 					// Start of a new bracketed set.
-					new
-						t2[E_TOKEN];
-					Parser_BuildTree(0);
-					Parser_GetNextToken(t2);
-					if (t2[E_TOKEN_TYPE] != e_TOKEN_TYPE_OP || t2[E_TOKEN_OP] != e_TOKEN_OP_CL_SQUARE)
+					pos = Parser_BuildTree(0);
+					Parser_GetNextToken(token);
+					if (token[E_TOKEN_TYPE] != e_TOKEN_TYPE_OP || token[E_TOKEN_OP] != e_TOKEN_OP_CL_SQUARE)
 					{
 						new
 							pp[32];
-						Parser_Print(t2, pp);
+						Parser_Print(token, pp);
 						return Parser_Error("Expected token \")\", but found: %s", pp);
 					}
 				}
@@ -807,31 +819,97 @@ static stock Parser_GetLeft(prec)
 					e_TOKEN_OP_INV,
 					e_TOKEN_OP_ADD,
 					e_TOKEN_OP_SUB,
-					e_TOKEN_OP_CL_INC,
-					e_TOKEN_OP_CL_DEC,
-					e_TOKEN_OP_CL_HASH:
+					e_TOKEN_OP_INC,
+					e_TOKEN_OP_DEC,
+					e_TOKEN_OP_HASH:
 				{
-					token[E_TOKEN_LEFT] = -1;
-					token[E_TOKEN_RIGHT] = Parser_BuildTree(prec);
+					++ISI_gParsePos,
+					token[E_TOKEN_RIGHT] = Parser_GetLeft(prec),
+					ISI_gParseTree[pos] = token;
 				}
 				default: return Parser_Error("Expected value, found %s", Parser_PrintOp(token[E_TOKEN_OP]));
 			}
 		}
+		case e_TOKEN_TYPE_VAR:
+		{
+			// Check for postfix operators.
+			new
+				t2[E_TOKEN];
+			ISI_gParseTree[ISI_gParsePos++] = token;
+			for ( ; ; )
+			{
+				t2 = Parser_PeekToken();
+				if (t2[E_TOKEN_TYPE] == e_TOKEN_TYPE_OP)
+				{
+					switch (t2[E_TOKEN_OP])
+					{
+						case e_TOKEN_OP_INC, e_TOKEN_OP_DEC:
+						{
+							t2[E_TOKEN_LEFT] = pos,
+							t2[E_TOKEN_RIGHT] = -1,
+							ISI_gParseTree[(pos = ISI_gParsePos++)] = t2;
+							return pos;
+						}
+						case e_TOKEN_OP_OP_BRACKET:
+						{
+							t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_APP,
+							t2[E_TOKEN_LEFT] = pos,
+							t2[E_TOKEN_RIGHT] = Parser_GetLeft(prec),
+							ISI_gParseTree[(pos = ISI_gParsePos++)] = t2;
+							continue;
+						}
+						case e_TOKEN_OP_OP_SQUARE:
+						{
+							t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR,
+							t2[E_TOKEN_LEFT] = pos,
+							t2[E_TOKEN_RIGHT] = Parser_GetLeft(prec),
+							ISI_gParseTree[(pos = ISI_gParsePos++)] = t2;
+							continue;
+						}
+						default: return pos;
+					}
+				}
+				else return pos;
+			}
+		}
 		default:
 		{
-			token[E_TOKEN_LEFT] = -1;
-			token[E_TOKEN_RIGHT] = -1;
+			ISI_gParseTree[ISI_gParsePos++] = token;
 		}
 	}
-	return token;
-}
-
-static stock Parser_GetRight(prec)
-{
+	return pos;
 }
 
 static stock Parser_BuildTree(prec)
 {
+	new
+		left = Parser_GetLeft(prec),
+		token[E_TOKEN];
+	for ( ; ; )
+	{
+		new
+			p2 = prec;
+		token = Parser_PeekToken();
+		PP(token);
+		switch (token[E_TOKEN_TYPE])
+		{
+			case e_TOKEN_TYPE_NONE: break; // Done.
+			case e_TOKEN_TYPE_OP:
+			{
+				//printf("Cur prec = %d", prec);
+				if ((p2 = ISI_gscOpData[token[E_TOKEN_OP]][E_OPERATOR_DATA_PRECEDENCE]) <= prec) return left;
+			}
+			default: return Parser_Error("Unexpected token, expected operator.");
+		}
+		new
+			ret = ISI_gParsePos++;
+		Parser_GetNextToken(token), // We only peeked, so pop.
+		token[E_TOKEN_LEFT] = left,
+		token[E_TOKEN_RIGHT] = Parser_BuildTree(p2),
+		ISI_gParseTree[ret] = token,
+		left = ret;
+	}
+	return left;
 }
 
 /******************************************************************************\
@@ -856,6 +934,32 @@ static stock Parser_BuildTree(prec)
 #define PTO(%0,%1) ISI_gInputLine=#%0,ISI_gInputPtr=0,Parser_GetNextToken(ret),printf("%s: \"%s\"",(ret[E_TOKEN_TYPE]==e_TOKEN_TYPE_NUM&&ret[E_TOKEN_NUM_VAL]==%1)?("PASS"):("FAIL"),ISI_gInputLine)
 
 #define TEST_OP(%1) ISI_gInputLine=#%1,ISI_gInputPtr=0,Parser_GetNextToken(ret),printf("%s: \"%s\"",(ret[E_TOKEN_TYPE]==e_TOKEN_TYPE_OP&&!strcmp(Parser_PrintOp(ret[E_TOKEN_OP]),#%1))?("PASS"):("FAIL"),ISI_gInputLine)
+
+static stock Parser_PrintTree(tree[][E_TOKEN], entry)
+{
+	new str[1024] = "(";
+	if (tree[entry][E_TOKEN_LEFT] != -1)
+	{
+		format(str, sizeof (str), "%s%s", str, Parser_PrintTree(tree, tree[entry][E_TOKEN_LEFT]));
+	}
+	switch (tree[entry][E_TOKEN_TYPE])
+	{
+		case e_TOKEN_TYPE_STRING: format(str, sizeof (str), "%s%s",   str, tree[entry][_E_TOKEN_TEMP_STRING]);
+		case e_TOKEN_TYPE_FLOAT:  format(str, sizeof (str), "%s%.2f", str, tree[entry][E_TOKEN_FLOAT_VAL]);
+		case e_TOKEN_TYPE_NATIVE: format(str, sizeof (str), "%s%s",   str, tree[entry][_E_TOKEN_TEMP_STRING]);
+		case e_TOKEN_TYPE_FUNC:   format(str, sizeof (str), "%s%s",   str, tree[entry][_E_TOKEN_TEMP_STRING]);
+		case e_TOKEN_TYPE_VAR:    format(str, sizeof (str), "%s%s",   str, tree[entry][_E_TOKEN_TEMP_STRING]);
+		case e_TOKEN_TYPE_NUM:    format(str, sizeof (str), "%s%d",   str, tree[entry][E_TOKEN_NUM_VAL]);
+		case e_TOKEN_TYPE_BOOL:   format(str, sizeof (str), "%s%s",   str, (tree[entry][E_TOKEN_BOOL_VAL]) ? ("true") : ("false"));
+		case e_TOKEN_TYPE_OP:     format(str, sizeof (str), "%s%s",   str, Parser_PrintOp(tree[entry][E_TOKEN_OP]));
+	}
+	if (tree[entry][E_TOKEN_RIGHT] != -1)
+	{
+		format(str, sizeof (str), "%s%s", str, Parser_PrintTree(tree, tree[entry][E_TOKEN_RIGHT]));
+	}
+	strcat(str, ")", 1024);
+	return str;
+}
 
 main()
 {
@@ -938,14 +1042,25 @@ main()
 	TEST_OP("#");
 	TEST_OP("::");
 	
-	ISI_gInputLine = "34 0x55 7.7 \"Hello \\\"there\\\"\" 'a' MyFuncSymbol",
+	//ISI_gInputLine = "34 0x55 7.7 \"Hello \\\"there\\\"\" 'a' MyFuncSymbol",
+	ISI_gInputLine = "-someVar + 5 * ((44) + 5) / func(a, b, c) * arr[5][6][7]",
 	ISI_gInputPtr = 0;
-	new str[32];
+	new
+		pos = Parser_BuildTree(cellmin),
+		str[32];
+	print(Parser_PrintTree(ISI_gParseTree, pos));
+	/*while (pos != ISI_gParsePos)
+	{
+		Parser_Print(ISI_gParseTree[pos], str);
+		print(str);
+		++pos;
+	}*/
+	/*new str[32];
 	while (Parser_GetNextToken(ret))
 	{
 		Parser_Print(ret, str);
 		print(str);
-	}
+	}*/
 	
 	
 	//TEST_OP("\"");
