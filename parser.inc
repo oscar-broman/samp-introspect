@@ -58,7 +58,7 @@ enum e_TOKEN_OP
 	e_TOKEN_OP_COMMA, // ','
 	e_TOKEN_OP_POINT, // '.'
 	e_TOKEN_OP_COLON, // ':'
-	e_TOKEN_OP_QUESTION // '?'
+	e_TOKEN_OP_QUESTION, // '?'
 }
 
 enum e_TOKEN_TYPE
@@ -74,7 +74,7 @@ enum e_TOKEN_TYPE
 	e_TOKEN_TYPE_BOOL,
 	e_TOKEN_TYPE_OP,
 	e_TOKEN_TYPE_APP,
-	e_TOKEN_TYPE_ARR
+	e_TOKEN_TYPE_ARR,
 }
 
 enum E_TOKEN
@@ -85,16 +85,17 @@ enum E_TOKEN
 	bool:E_TOKEN_BOOL_VAL = 1,
 	e_TOKEN_OP:E_TOKEN_OP = 1,
 	E_TOKEN_SYM_PTR = 1,
+	E_TOKEN_STRING_IDX = 1,
 	E_TOKEN_NATIVE_IDX = 1,
 	E_TOKEN_LEFT,
 	E_TOKEN_RIGHT,
-	_E_TOKEN_TEMP_STRING[32]
+	//_E_TOKEN_TEMP_STRING[32],
 }
 
 enum E_OPERATOR_DATA
 {
 	E_OPERATOR_DATA_NAME[7],
-	E_OPERATOR_DATA_PRECEDENCE // -1 = unary only.
+	E_OPERATOR_DATA_PRECEDENCE, // -1 = unary only.
 }
 
 static stock const
@@ -162,6 +163,15 @@ static stock const
 			{"?", 6} // e_TOKEN_OP_QUESTION
 	};
 
+static stock
+	ISI_gInputLine[512],
+	ISI_gInputLen,
+	ISI_gInputPtr,
+	ISI_gParsePos,
+	ISI_gParseTree[512][E_TOKEN],
+	ISI_gsStringEnd,
+	ISI_gsStringTable[32] = {-1, ...};
+
 /******************************************************************************\
 |******************************************************************************|
 |******************************************************************************|
@@ -200,11 +210,15 @@ static stock Parser_Print(token[E_TOKEN], ret[], len = sizeof (ret))
 {
 	switch (token[E_TOKEN_TYPE])
 	{
-		case e_TOKEN_TYPE_STRING: format(ret, len, "STRING:   %s", token[_E_TOKEN_TEMP_STRING]);
+		case e_TOKEN_TYPE_STRING: format(ret, len, "STRING:   %s", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
+		case e_TOKEN_TYPE_NATIVE: format(ret, len, "NATIVE:   %s", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
+		case e_TOKEN_TYPE_FUNC:   format(ret, len, "FUNCTION: %s", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
+		case e_TOKEN_TYPE_VAR:    format(ret, len, "VARIABLE: %s", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
+		//case e_TOKEN_TYPE_STRING: format(ret, len, "STRING:   %s", token[_E_TOKEN_TEMP_STRING]);
+		//case e_TOKEN_TYPE_NATIVE: format(ret, len, "NATIVE:   %s", token[_E_TOKEN_TEMP_STRING]);
+		//case e_TOKEN_TYPE_FUNC:   format(ret, len, "FUNCTION: %s", token[_E_TOKEN_TEMP_STRING]);
+		//case e_TOKEN_TYPE_VAR:    format(ret, len, "VARIABLE: %s", token[_E_TOKEN_TEMP_STRING]);
 		case e_TOKEN_TYPE_FLOAT:  format(ret, len, "FLOAT:    %.2f", token[E_TOKEN_FLOAT_VAL]);
-		case e_TOKEN_TYPE_NATIVE: format(ret, len, "NATIVE:   %s", token[_E_TOKEN_TEMP_STRING]);
-		case e_TOKEN_TYPE_FUNC:   format(ret, len, "FUNCTION: %s", token[_E_TOKEN_TEMP_STRING]);
-		case e_TOKEN_TYPE_VAR:    format(ret, len, "VARIABLE: %s", token[_E_TOKEN_TEMP_STRING]);
 		case e_TOKEN_TYPE_NUM:    format(ret, len, "NUMBER:   %d", token[E_TOKEN_NUM_VAL]);
 		case e_TOKEN_TYPE_BOOL:   format(ret, len, "BOOLEAN:  %s", (token[E_TOKEN_BOOL_VAL]) ? ("true") : ("false"));
 		case e_TOKEN_TYPE_OP:     format(ret, len, "OPERATOR: %s", Parser_PrintOp(token[E_TOKEN_OP]));
@@ -221,13 +235,6 @@ static stock PP(token[E_TOKEN])
 
 #define Parser_Error(%0) printf("PARSER ERROR: " %0)
 
-static stock
-	ISI_gInputLine[512],
-	ISI_gInputLen,
-	ISI_gInputPtr,
-	ISI_gParsePos,
-	ISI_gParseTree[512][E_TOKEN];
-
 static stock Parser_PeekChar()
 {
 	return ISI_gInputLine[ISI_gInputPtr];
@@ -237,9 +244,23 @@ static stock Parser_PeekToken()
 {
 	// Find out what the next token is, then backtrack to the start of it.
 	new
-		ret[E_TOKEN] = {e_TOKEN_TYPE_NONE, 0, -1, -1, ""},
+		ret[E_TOKEN] = {e_TOKEN_TYPE_NONE, 0, -1, -1},
 		ptr = ISI_gInputPtr;
-	if (!Parser_GetNextToken(ret)) return ret;
+	ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NONE,
+	Parser_SkipWhitespace();
+	// We don't actually NEED the next token most of the time, just the type,
+	// which can be determined from the first character.  This solves a tiny and
+	// (possibly) rare issue when strings from "peek" would overwrite the true
+	// input.
+	switch (Parser_PeekChar())
+	{
+		case '\0': {}
+		case '0' .. '9': ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NUM;
+		case 'a' .. 'z', 'A' .. 'Z', '_', '@': ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_VAR;
+		case '"': ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_STRING;
+		case '\'': ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NUM;
+		default: Parser_GetOp(ret);
+	}
 	return
 		ISI_gInputPtr = ptr,
 		ret;
@@ -610,19 +631,19 @@ static stock Parser_GetNumber(ret[E_TOKEN])
 static stock Parser_GetString(ret[E_TOKEN])
 {
 	new
-		n = -1;
+		stringSlot;
 	ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_STRING,
 	++ISI_gInputPtr;
+	if ((stringSlot = Parser_ReserveString()) == -1) return Parser_Error("String table full.");
 	while (ISI_gInputLine[ISI_gInputPtr] != '\"')
 	{
-		if (ISI_gInputLine[ISI_gInputPtr]) ret[_E_TOKEN_TEMP_STRING][++n] = Parser_DoChar();
-		else
-		{
-			return Parser_Error("Unclosed string literal.");
-		}
+		// Copy the string to (possibly) earlier in the input string.
+		if (ISI_gInputLine[ISI_gInputPtr]) ISI_gInputLine[ISI_gsStringEnd++] = Parser_DoChar();
+		else return Parser_Error("Unclosed string literal.");
 	}
 	return
-		ret[_E_TOKEN_TEMP_STRING][++n] = '\0',
+		ISI_gInputLine[ISI_gsStringEnd++] = '\0',
+		ret[E_TOKEN_STRING_IDX] = stringSlot,
 		// Decimal (default).
 		++ISI_gInputPtr,
 		1;
@@ -681,8 +702,9 @@ static stock Parser_GetSymbol(ret[E_TOKEN])
 Parser_GetSymbol_return:*/
 	return
 		ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_VAR,
-		ret[_E_TOKEN_TEMP_STRING][0] = '\0',
-		strcat(ret[_E_TOKEN_TEMP_STRING], ISI_gInputLine[ISI_gInputPtr], 32),
+		ret[E_TOKEN_STRING_IDX] = Parser_AddString(ISI_gInputPtr),
+		//ret[_E_TOKEN_TEMP_STRING][0] = '\0',
+		//strcat(ret[_E_TOKEN_TEMP_STRING], ISI_gInputLine[ISI_gInputPtr], 32),
 		//strcpy(ret[_E_TOKEN_TEMP_STRING], ISI_gInputLine[ISI_gInputPtr], 32),
 		ISI_gInputLine[(ISI_gInputPtr = ptr)] = tmp,
 		1;
@@ -762,7 +784,7 @@ static stock Parser_GetChar(ret[E_TOKEN])
 static stock Parser_GetLeft(prec)
 {
 	new
-		token[E_TOKEN] = {e_TOKEN_TYPE_NONE, 0, -1, -1, ""},
+		token[E_TOKEN] = {e_TOKEN_TYPE_NONE, 0, -1, -1},
 		pos = ISI_gParsePos;
 	if (pos >= sizeof (ISI_gParseTree)) return Parser_Error("Parse Tree full.");
 	Parser_GetNextToken(token);
@@ -880,7 +902,7 @@ static stock Parser_GetLeft(prec)
 	return pos;
 }
 
-static stock Parser_BuildTree(prec)
+stock Parser_BuildTree(prec = cellmin)
 {
 	new
 		left = Parser_GetLeft(prec),
@@ -910,6 +932,29 @@ static stock Parser_BuildTree(prec)
 		left = ret;
 	}
 	return left;
+}
+
+stock Parser_SetInput(line[], size = sizeof (line))
+{
+	if (size > sizeof (ISI_gInputLine)) return Parser_Error("Insufficient line space.");
+	new
+		blank[sizeof (ISI_gsStringTable)] = {-1, ...};
+	return
+		ISI_gsStringEnd = 0,
+		ISI_gsStringTable = blank,
+		ISI_gInputLine[0] = '\0',
+		strcat(ISI_gInputLine, line),
+		ISI_gParsePos = 0,
+		ISI_gInputPtr = 0,
+		1;
+}
+
+stock Parser_GetToken(n)
+{
+	new
+		fail[E_TOKEN] = {e_TOKEN_TYPE_NONE, 0, -1, -1};
+	if (0 <= n < sizeof (ISI_gParseTree)) return ISI_gParseTree[n];
+	return fail;
 }
 
 /******************************************************************************\
@@ -944,11 +989,11 @@ static stock Parser_PrintTree(tree[][E_TOKEN], entry)
 	}
 	switch (tree[entry][E_TOKEN_TYPE])
 	{
-		case e_TOKEN_TYPE_STRING: format(str, sizeof (str), "%s%s",   str, tree[entry][_E_TOKEN_TEMP_STRING]);
+		case e_TOKEN_TYPE_STRING: format(str, sizeof (str), "%s%s",   str, ISI_gInputLine[ISI_gsStringTable[tree[entry][E_TOKEN_STRING_IDX]]]);
 		case e_TOKEN_TYPE_FLOAT:  format(str, sizeof (str), "%s%.2f", str, tree[entry][E_TOKEN_FLOAT_VAL]);
-		case e_TOKEN_TYPE_NATIVE: format(str, sizeof (str), "%s%s",   str, tree[entry][_E_TOKEN_TEMP_STRING]);
-		case e_TOKEN_TYPE_FUNC:   format(str, sizeof (str), "%s%s",   str, tree[entry][_E_TOKEN_TEMP_STRING]);
-		case e_TOKEN_TYPE_VAR:    format(str, sizeof (str), "%s%s",   str, tree[entry][_E_TOKEN_TEMP_STRING]);
+		case e_TOKEN_TYPE_NATIVE: format(str, sizeof (str), "%s%s",   str, ISI_gInputLine[ISI_gsStringTable[tree[entry][E_TOKEN_STRING_IDX]]]);
+		case e_TOKEN_TYPE_FUNC:   format(str, sizeof (str), "%s%s",   str, ISI_gInputLine[ISI_gsStringTable[tree[entry][E_TOKEN_STRING_IDX]]]);
+		case e_TOKEN_TYPE_VAR:    format(str, sizeof (str), "%s%s",   str, ISI_gInputLine[ISI_gsStringTable[tree[entry][E_TOKEN_STRING_IDX]]]);
 		case e_TOKEN_TYPE_NUM:    format(str, sizeof (str), "%s%d",   str, tree[entry][E_TOKEN_NUM_VAL]);
 		case e_TOKEN_TYPE_BOOL:   format(str, sizeof (str), "%s%s",   str, (tree[entry][E_TOKEN_BOOL_VAL]) ? ("true") : ("false"));
 		case e_TOKEN_TYPE_OP:     format(str, sizeof (str), "%s%s",   str, Parser_PrintOp(tree[entry][E_TOKEN_OP]));
@@ -1088,3 +1133,87 @@ main()
 }
 
 #endif
+
+/******************************************************************************\
+|******************************************************************************|
+|******************************************************************************|
+|******************************************************************************|
+|****                                                                      ****|
+|****                               STRINGS                                ****|
+|****                                                                      ****|
+|******************************************************************************|
+|******************************************************************************|
+|******************************************************************************|
+\******************************************************************************/
+
+static stock Parser_AddString(start)
+{
+	new
+		i = 0;
+	for ( ; i != sizeof (ISI_gsStringTable); ++i)
+	{
+		if (ISI_gsStringTable[i] == -1) break;
+	}
+	if (i == sizeof (ISI_gsStringTable)) return -1;
+	ISI_gsStringTable[i] = ISI_gsStringEnd;
+	while ((ISI_gInputLine[ISI_gsStringEnd++] = ISI_gInputLine[start++])) {}
+	return i;
+}
+
+static stock Parser_ReserveString()
+{
+	new
+		i = 0;
+	for ( ; i != sizeof (ISI_gsStringTable); ++i)
+	{
+		if (ISI_gsStringTable[i] == -1) break;
+	}
+	if (i == sizeof (ISI_gsStringTable)) return -1;
+	ISI_gsStringTable[i] = ISI_gsStringEnd;
+	return i;
+}
+
+static stock Parser_RemoveString(idx)
+{
+	if (idx == -1) return;
+	new
+		rem = ISI_gsStringTable[idx];
+	if (rem == -1) return;
+	for ( ; ; )
+	{
+		new
+			top = cellmax,
+			found = -1;
+		// Find the next highest slot string.
+		for (new i = 0; i != sizeof (ISI_gsStringTable); ++i)
+		{
+			if (rem < ISI_gsStringTable[i] < top)
+			{
+				top = ISI_gsStringTable[i],
+				found = i;
+			}
+		}
+		if (found == -1) break;
+		ISI_gsStringTable[found] = rem;
+		// There must be a faster way than this...  Given that the ranges may be
+		// overlapping.
+		while ((ISI_gInputLine[rem++] = ISI_gInputLine[top++])) {}
+	}
+	ISI_gsStringTable[idx] = -1;
+}
+
+static stock Parser_InsertString(str[])
+{
+	new
+		i = 0;
+	for ( ; i != sizeof (ISI_gsStringTable); ++i)
+	{
+		if (ISI_gsStringTable[i] == -1) break;
+	}
+	if (i == sizeof (ISI_gsStringTable)) return -1;
+	ISI_gsStringTable[i] = ISI_gsStringEnd;
+	new
+		idx = 0;
+	while ((ISI_gInputLine[ISI_gsStringEnd++] = str[idx++])) {}
+	return i;
+}
