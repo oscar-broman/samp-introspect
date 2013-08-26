@@ -125,7 +125,6 @@ stock ReadAmxDebugData(File:fp) {
 	ReadSymbolTable(fp, num_symbols);
 	
 	// Read function arguments from the symbol table
-	// TODO: check if all locals are declared after functions, in which case a re-parse won't be necessary
 	fseek(fp, offset);
 	ReadSymbolTable(fp, num_symbols, true);
 	
@@ -227,19 +226,6 @@ stock GetFunctionInfo(const name[], info[E_FUNCTION]) {
 		if (!strcmp(name, s_Functions[i][Name])) {
 			memcpy(info[E_FUNCTION:0], s_Functions[i][E_FUNCTION:0], 0, _:E_FUNCTION * 4, _:E_FUNCTION);
 			
-			//info[Address] = s_Functions[i][Address];
-			//info[CodeStart] = s_Functions[i][CodeStart];
-			//info[CodeEnd] = s_Functions[i][CodeEnd];
-			//info[Tag] = s_Functions[i][Tag];
-			//info[DimensionSize] = s_Functions[i][DimensionSize];
-			//info[StaticArgs] = s_Functions[i][StaticArgs];
-			//
-			//strunpack(info[Name], s_Functions[i][Name], 48);
-			//
-			//for (new j = 0; j < s_Functions[i][StaticArgs]; j++) {
-			//	info[Arg][j] = s_Functions[i][Arg][j];
-			//}
-			
 			return true;
 		}
 	}
@@ -250,19 +236,6 @@ stock GetFunctionInfo(const name[], info[E_FUNCTION]) {
 stock GetVariableInfo(const name[], info[E_VARIABLE]) {
 	for (new i = 0; i < s_NumGlobals; i++) {
 		if (!strcmp(name, s_Globals[i][Name])) {
-			//info[Address] = s_Globals[i][Address];
-			//info[Tag] = s_Globals[i][Tag];
-			//info[CodeStart] = s_Globals[i][CodeStart];
-			//info[CodeEnd] = s_Globals[i][CodeEnd];
-			//info[Ident] = s_Globals[i][Ident];
-			//info[Dimensions] = s_Globals[i][Dimensions];
-			//strunpack(info[Name], s_Globals[i][Name], 32);
-	        //
-			//for (new j = 0; j < 3; j++) {
-			//	info[DimensionSize][j] = s_Globals[i][DimensionSize][j];
-			//	info[DimensionTag][j] = s_Globals[i][DimensionTag][j];
-			//}
-			
 			memcpy(info[E_VARIABLE:0], s_Globals[i][E_VARIABLE:0], 0, _:E_VARIABLE * 4, _:E_VARIABLE);
 			
 			return true;
@@ -284,19 +257,6 @@ stock GetFunctionArgument(const func_info[E_FUNCTION], idx, info[E_VARIABLE]) {
 	if (!(0 <= arg < s_NumArguments)) {
 		return false;
 	}
-	
-	//info[Address] = s_Arguments[arg][Address];
-	//info[Tag] = s_Arguments[arg][Tag];
-	//info[CodeStart] = s_Arguments[arg][CodeStart];
-	//info[CodeEnd] = s_Arguments[arg][CodeEnd];
-	//info[Ident] = s_Arguments[arg][Ident];
-	//info[Dimensions] = s_Arguments[arg][Dimensions];
-	//strunpack(info[Name], s_Arguments[arg][Name], 32);
-	//
-	//for (new i = 0; i < 3; i++) {
-	//	info[DimensionSize][i] = s_Arguments[arg][DimensionSize][i];
-	//	info[DimensionTag][i] = s_Arguments[arg][DimensionTag][i];
-	//}
 	
 	memcpy(info[E_VARIABLE:0], s_Arguments[arg][E_VARIABLE:0], 0, _:E_VARIABLE * 4, _:E_VARIABLE);
 	
