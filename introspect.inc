@@ -20,6 +20,8 @@
 	#define MAX_TAGS 512
 #endif
 
+#include "introspect-debug-info"
+
 #if defined INTROSPECT_NATIVES
 	#include "introspect-natives"
 	
@@ -33,266 +35,35 @@
 
 static const s_AmxName[] = AMX_NAME;
 
-enum {
-	IDENT_VARIABLE  = 1,
-	IDENT_REFERENCE = 2,
-	IDENT_ARRAY     = 3,
-	IDENT_REFARRAY  = 4,
-	IDENT_FUNCTION  = 9
-}
-
-enum {
-	VCLASS_GLOBAL,
-	VCLASS_LOCAL,
-	VCLASS_STATIC
-}
-
-enum E_VARIABLE {
-	Address,
-	Tag,
-	Name[32],
-	Dimensions,
-	DimensionSize[3]
-}
-
-enum E_FUNCTION {
-	Address,
-	Name[48],
-	Tag,
-	DimensionSize
-}
-
-enum E_TAG {
-	Tag,
-	Name[32]
-}
-
-static
-	s_FloatTag,
-	s_Variables[MAX_GLOBAL_VARIABLES][E_VARIABLE],
-	s_Functions[MAX_FUNCTIONS][E_FUNCTION],
-//	s_Tags[MAX_TAGS][E_TAG],
-	
-	s_NumVariables,
-	s_NumFunctions
-//	s_NumTags
-;
-
 stock IntrospectInit() {
 	new File:fp = fopen(s_AmxName, io_read);
 	
+	// Try some more versions based on Y_Less' tool: http://forum.sa-mp.com/showthread.php?t=458669
+	if (!fp) {
+		static const s_ServerDir[] = "DANGEROUS_SERVER_ROOT/";
+		static const s_ModeDirs[][] = {
+			"gamemodes/",
+			"filterscripts/",
+			"npcmodes/"
+		};
+		new path[64];
+		for (new i = 0; i != 6; ++i) {
+			format(path, sizeof (path), "%s%s%s", (i < 3) ? (s_ServerDir) : (""), s_ModeDirs[i % 3], s_AmxName);
+			if ((fp = fopen(path))) break;
+		}
+	}
+
 	if (!fp) {
 		printf("(introspect.inc) Unable to open \"%s\"", s_AmxName);
-		
+
 		return false;
 	}
 	
-	// Go to the end of the AMX (0 contains the size excluding debug information)
-	fseek(fp, freadcell(fp));
-	
-	new size         = freadcell(fp);
-	new magic        = freadshort(fp);
-	new file_version = freadbyte(fp);
-	new amx_version  = freadbyte(fp);
-	new flags        = freadshort(fp);
-	new num_files    = freadshort(fp);
-	new num_lines    = freadshort(fp);
-	new num_symbols  = freadshort(fp);
-	new num_tags     = freadshort(fp);
-	new num_machines = freadshort(fp);
-	new num_states   = freadshort(fp);
-	
-	#pragma unused num_states, num_machines, flags, amx_version, file_version, magic, size
-	
-	// Skip the file table
-	for (new i = 0; i < num_files; i++) {
-		fseek(fp, 4, seek_current);
-		while (freadbyte(fp)) {}
-	}
-	
-	// Skip the line table
-	fseek(fp, num_lines * 8, seek_current);
-	
-	// Read the symbol table
-	for (new i = 0; i < num_symbols; i++) {
-		new address = freadcell(fp);
-		new tag = freadshort(fp);
-		new codestart = freadcell(fp);
-		new codeend = freadcell(fp);
-		new ident = freadbyte(fp);
-		new vclass = freadbyte(fp);
-		new dim = freadshort(fp);
-		new name[48]; freadstr(fp, name);
-		new dim_size[4];
-		
-		#pragma unused codestart, codeend
-		
-		for (new j = 0; j < dim; j++) {
-			freadshort(fp);
-			
-			dim_size[j] = freadcell(fp);
-		}
-		
-		if (vclass != VCLASS_GLOBAL) {
-			continue;
-		}
-		
-		switch (ident) {
-			case IDENT_VARIABLE,
-			     IDENT_ARRAY: {
-				s_Variables[s_NumVariables][Address] = address;
-				s_Variables[s_NumVariables][Tag] = tag;
-				s_Variables[s_NumVariables][Dimensions] = dim;
-				s_Variables[s_NumVariables][DimensionSize][0] = dim_size[0];
-				s_Variables[s_NumVariables][DimensionSize][1] = dim_size[1];
-				s_Variables[s_NumVariables][DimensionSize][2] = dim_size[2];
-				strunpack(s_Variables[s_NumVariables][Name], name, 32);
-				
-				s_NumVariables++;
-			}
-			
-			case IDENT_FUNCTION: {
-				s_Functions[s_NumFunctions][Address] = address;
-				strunpack(s_Functions[s_NumFunctions][Name], name, 48);
-				s_Functions[s_NumFunctions][Tag] = tag;
-				s_Functions[s_NumFunctions][DimensionSize] = dim_size[0];
-				
-				s_NumFunctions++;
-			}
-		}
-	}
-	
-	for (new i = 0; i < num_tags; i++) {
-		new tag = freadshort(fp);
-		new name[32]; freadstr(fp, name);
-		
-		if (!strcmp(name, !"Float")) {
-			s_FloatTag = i;
-		}
-	}
+	ReadAmxDebugData(fp);
 	
 	fclose(fp);
 	
 	return true;
-}
-
-stock GetFunctionAddress(const name[]) {
-	for (new i = 0; i < s_NumFunctions; i++) {
-		if (!strcmp(name, s_Functions[i][Name])) {
-			return s_Functions[i][Address];
-		}
-	}
-	
-	return -1;
-}
-
-stock GetFunctionInfo(const name[], info[E_FUNCTION]) {
-	for (new i = 0; i < s_NumFunctions; i++) {
-		if (!strcmp(name, s_Functions[i][Name])) {
-			info[Address] = s_Functions[i][Address];
-			info[Tag] = s_Functions[i][Tag];
-			info[DimensionSize] = s_Functions[i][DimensionSize];
-			strunpack(info[Name], s_Functions[i][Name], 32);
-			
-			return true;
-		}
-	}
-	
-	return false;
-}
-
-stock GetVariableInfo(const name[], info[E_VARIABLE]) {
-	new sym[32], idx = 0, deref = 0, deref_idx[3];
-	
-	if (!ReadSymbol(name, idx, sym)) {
-		return false;
-	}
-	
-	SkipSpaces(name, idx);
-	
-	while (name[idx] == '[' && deref < 3) {
-		new type;
-		
-		idx++, SkipSpaces(name, idx);
-		
-		if (!ReadNumber(name, idx, deref_idx[deref], type)) {
-			return false;
-		}
-		
-		SkipSpaces(name, idx);
-		
-		if (name[idx++] != ']') {
-			return false;
-		}
-		
-		deref++;
-	}
-	
-	for (new i = 0; i < s_NumVariables; i++) {
-		if (!strcmp(sym, s_Variables[i][Name])) {
-			info[Address] = s_Variables[i][Address];
-			info[Tag] = s_Variables[i][Tag];
-			info[Dimensions] = s_Variables[i][Dimensions];
-			info[DimensionSize][0] = s_Variables[i][DimensionSize][0];
-			info[DimensionSize][1] = s_Variables[i][DimensionSize][1];
-			info[DimensionSize][2] = s_Variables[i][DimensionSize][2];
-			strunpack(info[Name], s_Variables[i][Name], 32);
-			
-			if (deref) {
-				info[Dimensions] -= 1;
-				info[DimensionSize][0] = info[DimensionSize][1];
-				info[DimensionSize][1] = info[DimensionSize][2];
-				info[DimensionSize][2] = 0;
-				
-				info[Address] += deref_idx[--deref] * 4;
-			}
-			
-			return true;
-		}
-	}
-	
-	return false;
-}
-
-// Read a single cell
-static freadcell(File:fp) {
-	new buf[1];
-	
-	fblockread(fp, buf);
-	
-	return buf[0];
-}
-
-// Read a 16-bit integer
-static freadshort(File:fp) {
-	new buf[1];
-	
-	fblockread(fp, buf);
-	fseek(fp, -2, seek_current);
-	
-	return buf[0] & 0xFFFF;
-}
-
-// Read a single byte
-static freadbyte(File:fp) {
-	return fgetchar(fp, 0, false);
-}
-
-// Read a zero-terminated string
-static freadstr(File:fp, buf[], maxlength = sizeof(buf)) {
-	new i = 0, c;
-	
-	buf[i] = '\0';
-	
-	while ((c = fgetchar(fp, 0))) {
-		if (i + 1 < maxlength) {
-			buf[i++] = c;
-		}
-	}
-	
-	buf[i] = '\0';
-	
-	return i;
 }
 
 static ReadSymbol(const input[], &index, output[], maxlength = sizeof(output)) {
@@ -673,7 +444,7 @@ stock RunSimpleStatement(const statement[], &output_type = 0, output[] = {0}, ou
 		
 		output[0] = retval;
 		
-		if (info[Tag] == s_FloatTag) {
+		if (!strcmp("Float", GetTagName(info[Tag]))) {
 			output_type = 'f';
 		} else {
 			output_type = 'i';

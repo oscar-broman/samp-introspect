@@ -90,15 +90,6 @@ main() {
 		print("Variable not found.");
 	}
 	
-	new address = GetFunctionAddress("SomeFunction");
-	
-	if (address) {
-		print("SomeFunction");
-		printf("  Address: %08x", address);
-	} else {
-		print("Function not found.");
-	}
-	
 	g_TestArray[3] = 123;
 	g_TestArray2[7][8] = 456;
 	
