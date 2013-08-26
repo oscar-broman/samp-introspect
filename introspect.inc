@@ -66,6 +66,31 @@ stock IntrospectInit() {
 	return true;
 }
 
+stock DereferenceArray(addr, dimensions, ...) {
+	new resolve = numargs() - 3;
+	
+	for (new i = 0; i <= resolve; i++) {
+		new idx = getarg(2 + i);
+	
+		if (i + 1 >= dimensions) {
+			#emit LOAD.S.pri idx
+			#emit LOAD.S.alt addr
+			#emit IDXADDR
+			#emit STOR.S.pri addr
+		} else {
+			#emit LOAD.S.pri idx
+			#emit LOAD.S.alt addr
+			#emit IDXADDR
+			#emit MOVE.alt
+			#emit LOAD.I
+			#emit ADD
+			#emit STOR.S.pri addr
+		}
+	}
+	
+	return addr;
+}
+
 static ReadSymbol(const input[], &index, output[], maxlength = sizeof(output)) {
 	new i = index, j = 0;
 	
