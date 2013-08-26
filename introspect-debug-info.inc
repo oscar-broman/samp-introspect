@@ -266,13 +266,11 @@ stock GetFunctionArgument(const func_info[E_FUNCTION], idx, info[E_VARIABLE]) {
 stock GetTagName(tag) {
 	new output[32] = "";
 	
-	if (0 <= tag < s_NumTags) {
-		strunpack(output, s_Tags[tag][Name]);
-	} else {
-		for (new i = 0; i < s_NumTags; i++) {
-			if (s_Tags[i][Tag] == tag) {
-				strunpack(output, s_Tags[i][Name]);
-			}
+	tag &= 0xC0000000;
+	
+	for (new i = 0; i < s_NumTags; i++) {
+		if (s_Tags[i][Tag] == tag) {
+			strunpack(output, s_Tags[i][Name]);
 		}
 	}
 	
