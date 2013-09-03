@@ -36,6 +36,14 @@
 static const s_AmxName[] = AMX_NAME;
 
 stock IntrospectInit() {
+	static s_initialized = false;
+	
+	if (s_initialized) {
+		return true;
+	} else {
+		s_initialized = true;
+	}
+	
 	new File:fp = fopen(s_AmxName, io_read);
 	
 	// Try some more versions based on Y_Less' tool: http://forum.sa-mp.com/showthread.php?t=458669
@@ -66,7 +74,7 @@ stock IntrospectInit() {
 	return true;
 }
 
-stock DereferenceArray(addr, dimensions, ...) {
+static DereferenceArray(addr, dimensions, ...) {
 	new resolve = numargs() - 3;
 	
 	for (new i = 0; i <= resolve; i++) {
@@ -230,6 +238,42 @@ static ReadNumber(const input[], &index, &output, &type) {
 	return true;
 }
 
+static ReadArrayIndexes(info[E_VARIABLE], const input[], &index) {
+	SkipSpaces(input, index);
+	
+	while (input[index] == '[') {
+		index++, SkipSpaces(input, index);
+		
+		new idx, type;
+		
+		if (!ReadNumber(input, index, idx, type) || type != 'i') {
+			return false;
+		}
+		
+		info[Address] = DereferenceArray(info[Address], info[Dimensions], idx);
+		
+		info[Dimensions]--;
+		
+		info[DimensionSize][0] = info[DimensionSize][1];
+		info[DimensionSize][1] = info[DimensionSize][2];
+		info[DimensionSize][2] = 0;
+		
+		info[DimensionTag][0] = info[DimensionTag][1];
+		info[DimensionTag][1] = info[DimensionTag][2];
+		info[DimensionTag][2] = 0;
+		
+		SkipSpaces(input, index);
+		
+		if (input[index] == ']') {
+			index++, SkipSpaces(input, index);
+		} else {
+			return false;
+		}
+	}
+	
+	return true;
+}
+
 static SkipSpaces(const buf[], &index) {
 	while ('\0' < buf[index] <= ' ') {
 		index++;
@@ -244,6 +288,8 @@ static GetVariableAddress(...) {
 }
 
 stock RunSimpleStatement(const statement[], &output_type = 0, output[] = {0}, outlen = sizeof(output), error[] = "", errlen = sizeof(error)) {
+	IntrospectInit();
+	
 	new sym[32], idx = 0, start_idx;
 	
 	#pragma unused outlen
@@ -263,13 +309,31 @@ stock RunSimpleStatement(const statement[], &output_type = 0, output[] = {0}, ou
 	if (statement[idx] == '=' || statement[idx] == '[') {
 		new info[E_VARIABLE];
 		
-		if (!GetVariableInfo(statement[start_idx], info)) {
+		if (!GetVariableInfo(sym, info)) {
 			format(error, errlen, "Invalid variable: %s", sym);
 			
 			return false;
 		}
 		
-		idx++, SkipSpaces(statement, idx);
+		if (statement[idx] == '[') {
+			if (!ReadArrayIndexes(info, statement, idx)) {
+				format(error, errlen, "Failed to read array subscripts");
+				
+				return false;
+			}
+			
+			SkipSpaces(statement, idx);
+		}
+		
+		if (statement[idx] != '=') {
+			format(error, errlen, "Expected \"=\"");
+			
+			return false;
+		}
+		
+		idx++;
+		
+		SkipSpaces(statement, idx);
 		
 		switch (statement[idx]) {
 			case '"': {

@@ -90,16 +90,17 @@ main() {
 		print("Variable not found.");
 	}
 	
-	g_TestArray[3] = 123;
-	g_TestArray2[7][8] = 456;
+	g_TestArray[3] = 11;
+	g_TestArray2[7][8] = 22;
 	
 	printf("%d, %d", g_TestArray[3], g_TestArray2[7][8]);
 	
-	//GetVariableInfo("g_TestArray[3]", info);
-	//GetVariableInfo("g_TestArray2[7][8]", info);
-	
-	RunSimpleStatement("g_TestArray[3] = 5");
+	RunSimpleStatement("g_TestArray[3] = 33");
+	RunSimpleStatement("g_TestArray2[7][8] = 44");
 	
 	printf("%d, %d", g_TestArray[3], g_TestArray2[7][8]);
+	
+	new Float:asd;
+	printf("%08x",tagof(asd));
 }
 
