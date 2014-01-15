@@ -1,4 +1,4 @@
-#include "introspect"
+//#include "introspect"
 
 #include <a_samp>
 // Tokeniser.  Read text and convert it to tokens for simple processing.
@@ -210,23 +210,22 @@ static stock Parser_Print(token[E_TOKEN], ret[], len = sizeof (ret))
 {
 	switch (token[E_TOKEN_TYPE])
 	{
+		case e_TOKEN_TYPE_NONE:   ret[0] = '\0';
 		case e_TOKEN_TYPE_STRING: format(ret, len, "STRING:   %s", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
 		case e_TOKEN_TYPE_NATIVE: format(ret, len, "NATIVE:   %s", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
 		case e_TOKEN_TYPE_FUNC:   format(ret, len, "FUNCTION: %s", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
 		case e_TOKEN_TYPE_VAR:    format(ret, len, "VARIABLE: %s", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
-		//case e_TOKEN_TYPE_STRING: format(ret, len, "STRING:   %s", token[_E_TOKEN_TEMP_STRING]);
-		//case e_TOKEN_TYPE_NATIVE: format(ret, len, "NATIVE:   %s", token[_E_TOKEN_TEMP_STRING]);
-		//case e_TOKEN_TYPE_FUNC:   format(ret, len, "FUNCTION: %s", token[_E_TOKEN_TEMP_STRING]);
-		//case e_TOKEN_TYPE_VAR:    format(ret, len, "VARIABLE: %s", token[_E_TOKEN_TEMP_STRING]);
 		case e_TOKEN_TYPE_FLOAT:  format(ret, len, "FLOAT:    %.2f", token[E_TOKEN_FLOAT_VAL]);
 		case e_TOKEN_TYPE_NUM:    format(ret, len, "NUMBER:   %d", token[E_TOKEN_NUM_VAL]);
 		case e_TOKEN_TYPE_BOOL:   format(ret, len, "BOOLEAN:  %s", (token[E_TOKEN_BOOL_VAL]) ? ("true") : ("false"));
 		case e_TOKEN_TYPE_OP:     format(ret, len, "OPERATOR: %s", Parser_PrintOp(token[E_TOKEN_OP]));
+		case e_TOKEN_TYPE_APP: ret[0] = '\0', strcat(ret, "APPLY", len);
+		case e_TOKEN_TYPE_ARR: ret[0] = '\0', strcat(ret, "INDEX", len);
 		default: ret[0] = '\0', strcat(ret, "<unknown>", len);
 	}
 }
 
-static stock PP(token[E_TOKEN])
+static stock PrettyPrint(token[E_TOKEN])
 {
 	new str[32];
 	Parser_Print(token, str);
@@ -244,7 +243,7 @@ static stock Parser_PeekToken()
 {
 	// Find out what the next token is, then backtrack to the start of it.
 	new
-		ret[E_TOKEN] = {e_TOKEN_TYPE_NONE, 0, -1, -1},
+		ret[E_TOKEN] = {e_TOKEN_TYPE_NONE, 0, Float:-1, bool:-1},
 		ptr = ISI_gInputPtr;
 	ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NONE,
 	Parser_SkipWhitespace();
@@ -784,7 +783,7 @@ static stock Parser_GetChar(ret[E_TOKEN])
 static stock Parser_GetLeft(prec)
 {
 	new
-		token[E_TOKEN] = {e_TOKEN_TYPE_NONE, 0, -1, -1},
+		token[E_TOKEN] = {e_TOKEN_TYPE_NONE, 0, Float:-1, bool:-1},
 		pos = ISI_gParsePos;
 	if (pos >= sizeof (ISI_gParseTree)) return Parser_Error("Parse Tree full.");
 	Parser_GetNextToken(token);
@@ -869,7 +868,8 @@ static stock Parser_GetLeft(prec)
 						{
 							t2[E_TOKEN_LEFT] = pos,
 							t2[E_TOKEN_RIGHT] = -1,
-							ISI_gParseTree[(pos = ISI_gParsePos++)] = t2;
+							ISI_gParseTree[(pos = ISI_gParsePos++)] = t2,
+							Parser_GetNextToken(t2); // Consume
 							return pos;
 						}
 						case e_TOKEN_OP_OP_BRACKET:
@@ -912,7 +912,7 @@ stock Parser_BuildTree(prec = cellmin)
 		new
 			p2 = prec;
 		token = Parser_PeekToken();
-		PP(token);
+		//PrettyPrint(token);
 		switch (token[E_TOKEN_TYPE])
 		{
 			case e_TOKEN_TYPE_NONE: break; // Done.
@@ -980,35 +980,81 @@ stock Parser_GetToken(n)
 
 #define TEST_OP(%1) ISI_gInputLine=#%1,ISI_gInputPtr=0,Parser_GetNextToken(ret),printf("%s: \"%s\"",(ret[E_TOKEN_TYPE]==e_TOKEN_TYPE_OP&&!strcmp(Parser_PrintOp(ret[E_TOKEN_OP]),#%1))?("PASS"):("FAIL"),ISI_gInputLine)
 
-static stock Parser_PrintTree(tree[][E_TOKEN], entry)
+stock Parser_PrintExpr(str[], size, tree[][E_TOKEN], entry)
 {
-	new str[1024] = "(";
-	if (tree[entry][E_TOKEN_LEFT] != -1)
+	str[0] = '\0',
+	_Parser_PrintExpr(str, size, tree, entry);
+}
+
+static stock _Parser_PrintToken(str[], size, token[E_TOKEN], bool:bracket)
+{
+	switch (token[E_TOKEN_TYPE])
 	{
-		format(str, sizeof (str), "%s%s", str, Parser_PrintTree(tree, tree[entry][E_TOKEN_LEFT]));
+		case e_TOKEN_TYPE_STRING: format(str, size, "%s\"%s\"", str, ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
+		case e_TOKEN_TYPE_FLOAT:  format(str, size, "%s%.2f",   str, token[E_TOKEN_FLOAT_VAL]);
+		case e_TOKEN_TYPE_NATIVE, e_TOKEN_TYPE_FUNC, e_TOKEN_TYPE_VAR:
+			strcat(str, ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]], size);
+		case e_TOKEN_TYPE_NUM:    format(str, size, "%s%d",     str, token[E_TOKEN_NUM_VAL]);
+		case e_TOKEN_TYPE_BOOL:   strcat(str, (token[E_TOKEN_BOOL_VAL]) ? ("true") : ("false"), size);
+		case e_TOKEN_TYPE_OP:
+			if (bracket) format(str, size, "%s(%s)", str, Parser_PrintOp(token[E_TOKEN_OP]));
+			else format(str, size, "%s%s", str, Parser_PrintOp(token[E_TOKEN_OP]));
+		case e_TOKEN_TYPE_APP:    strcat(str, "()", size);
+		case e_TOKEN_TYPE_ARR:    strcat(str, "[]", size);
 	}
+}
+
+static stock _Parser_PrintExpr(str[], size, tree[][E_TOKEN], entry)
+{
+	new
+		bool:bracket = false;
 	switch (tree[entry][E_TOKEN_TYPE])
 	{
-		case e_TOKEN_TYPE_STRING: format(str, sizeof (str), "%s%s",   str, ISI_gInputLine[ISI_gsStringTable[tree[entry][E_TOKEN_STRING_IDX]]]);
-		case e_TOKEN_TYPE_FLOAT:  format(str, sizeof (str), "%s%.2f", str, tree[entry][E_TOKEN_FLOAT_VAL]);
-		case e_TOKEN_TYPE_NATIVE: format(str, sizeof (str), "%s%s",   str, ISI_gInputLine[ISI_gsStringTable[tree[entry][E_TOKEN_STRING_IDX]]]);
-		case e_TOKEN_TYPE_FUNC:   format(str, sizeof (str), "%s%s",   str, ISI_gInputLine[ISI_gsStringTable[tree[entry][E_TOKEN_STRING_IDX]]]);
-		case e_TOKEN_TYPE_VAR:    format(str, sizeof (str), "%s%s",   str, ISI_gInputLine[ISI_gsStringTable[tree[entry][E_TOKEN_STRING_IDX]]]);
-		case e_TOKEN_TYPE_NUM:    format(str, sizeof (str), "%s%d",   str, tree[entry][E_TOKEN_NUM_VAL]);
-		case e_TOKEN_TYPE_BOOL:   format(str, sizeof (str), "%s%s",   str, (tree[entry][E_TOKEN_BOOL_VAL]) ? ("true") : ("false"));
-		case e_TOKEN_TYPE_OP:     format(str, sizeof (str), "%s%s",   str, Parser_PrintOp(tree[entry][E_TOKEN_OP]));
+		case e_TOKEN_TYPE_ARR:
+		{
+			_Parser_PrintExpr(str, size, tree, tree[entry][E_TOKEN_LEFT]);
+			strcat(str, "[", size);
+			_Parser_PrintExpr(str, size, tree, tree[entry][E_TOKEN_RIGHT]);
+			strcat(str, "]", size);
+			return;
+		}
+		case e_TOKEN_TYPE_APP:
+		{
+			_Parser_PrintExpr(str, size, tree, tree[entry][E_TOKEN_LEFT]);
+			strcat(str, "(", size);
+			_Parser_PrintExpr(str, size, tree, tree[entry][E_TOKEN_RIGHT]);
+			strcat(str, ")", size);
+			return;
+		}
+		case e_TOKEN_TYPE_OP: bracket = tree[entry][E_TOKEN_OP] != e_TOKEN_OP_COMMA;
 	}
-	if (tree[entry][E_TOKEN_RIGHT] != -1)
-	{
-		format(str, sizeof (str), "%s%s", str, Parser_PrintTree(tree, tree[entry][E_TOKEN_RIGHT]));
-	}
-	strcat(str, ")", 1024);
-	return str;
+	if (bracket) strcat(str, "(", size);
+	if (tree[entry][E_TOKEN_LEFT] != -1) _Parser_PrintExpr(str, size, tree, tree[entry][E_TOKEN_LEFT]);
+	_Parser_PrintToken(str, size, tree[entry], false);
+	if (tree[entry][E_TOKEN_RIGHT] != -1) _Parser_PrintExpr(str, size, tree, tree[entry][E_TOKEN_RIGHT]);
+	if (bracket) strcat(str, ")", size);
+}
+
+stock Parser_PrintTree(str[], size, tree[][E_TOKEN], entry)
+{
+	str[0] = '\0',
+	_Parser_PrintTree(str, size, tree, entry, 0);
+}
+
+static stock _Parser_PrintTree(str[], size, tree[][E_TOKEN], entry, indent)
+{
+	static const
+		sIndents[] = "|  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |- ";
+	strcat(str, sIndents[(sizeof (sIndents) - 1) - indent], size);
+	_Parser_PrintToken(str, size, tree[entry], true);
+	strcat(str, "\n", size);
+	if (tree[entry][E_TOKEN_LEFT] != -1) _Parser_PrintTree(str, size, tree, tree[entry][E_TOKEN_LEFT], indent + 3);
+	if (tree[entry][E_TOKEN_RIGHT] != -1) _Parser_PrintTree(str, size, tree, tree[entry][E_TOKEN_RIGHT], indent + 3);
 }
 
 main()
 {
-	IntrospectInit();
+	// IntrospectInit();
 	print("\n-------------------------");
 	print(" Introspect parser tests");
 	print("-------------------------\n");
@@ -1088,31 +1134,36 @@ main()
 	TEST_OP("::");
 	
 	//ISI_gInputLine = "34 0x55 7.7 \"Hello \\\"there\\\"\" 'a' MyFuncSymbol",
-	ISI_gInputLine = "-someVar + 5 * ((44) + 5) / func(a, b, c) * arr[5][6][7]",
+	ISI_gInputLine = "-someVar + 5 * ((44) + 5) / func(a, b, c) * arr[5][6][7] - someVar++ - ++someVar - someVar-- - --someVar",
 	ISI_gInputPtr = 0;
 	new
 		pos = Parser_BuildTree(cellmin),
-		str[32];
-	print(Parser_PrintTree(ISI_gParseTree, pos));
-	/*while (pos != ISI_gParsePos)
+		str[32],
+		output[2048];
+	//print(Parser_PrintTree(ISI_gParseTree, pos));
+	Parser_PrintTree(output, sizeof (output), ISI_gParseTree, pos);
+	print(output);
+	Parser_PrintExpr(output, sizeof (output), ISI_gParseTree, pos);
+	print(output);
+	while (pos != ISI_gParsePos)
 	{
 		Parser_Print(ISI_gParseTree[pos], str);
 		print(str);
 		++pos;
-	}*/
-	/*new str[32];
+	}
+	//new str[32];
 	while (Parser_GetNextToken(ret))
 	{
 		Parser_Print(ret, str);
 		print(str);
-	}*/
+	}
 	
 	
-	//TEST_OP("\"");
-	//TEST_OP("\'");
-	/*ISI_gInputLine = "70 5.5 0800 0100 0x345 0b11 0.888 0.888e3";
-	new
-		ret[E_TOKEN];
+	TEST_OP("\"");
+	TEST_OP("\'");
+	ISI_gInputLine = "70 5.5 0800 0100 0x345 0b11 0.888 0.888e3";
+	//new
+	//	ret[E_TOKEN];
 	printf("%d", e_TOKEN_TYPE_NUM);
 	Parser_GetNextToken(ret);
 	printf("T = %d %d", ret[E_TOKEN_TYPE], ret[E_TOKEN_NUM_VAL]);
@@ -1129,7 +1180,7 @@ main()
 	Parser_GetNextToken(ret);
 	printf("T = %d %f", ret[E_TOKEN_TYPE], ret[E_TOKEN_FLOAT_VAL]);
 	Parser_GetNextToken(ret);
-	printf("T = %d %f", ret[E_TOKEN_TYPE], ret[E_TOKEN_FLOAT_VAL]);*/
+	printf("T = %d %f", ret[E_TOKEN_TYPE], ret[E_TOKEN_FLOAT_VAL]);
 }
 
 #endif
