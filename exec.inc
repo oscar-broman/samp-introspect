@@ -119,3 +119,4 @@ static stock MI(ret[E_EXEC_RESULT])
 {
 	return (ret[E_EXEC_RESULT_TAG] == e_EXEC_RESULT_TAG_Float) ? floatround(token[E_TOKEN_FLOAT_VAL]) : (_:token[E_TOKEN_FLOAT_VAL]);
 }
+

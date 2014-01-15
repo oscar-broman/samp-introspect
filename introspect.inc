@@ -20,6 +20,8 @@
 	#define MAX_TAGS 512
 #endif
 
+#include "introspect-debug-info"
+
 #if defined INTROSPECT_NATIVES
 	#include "introspect-natives"
 	
@@ -33,52 +35,19 @@
 
 static const s_AmxName[] = AMX_NAME;
 
-enum {
-	IDENT_VARIABLE  = 1,
-	IDENT_REFERENCE = 2,
-	IDENT_ARRAY     = 3,
-	IDENT_REFARRAY  = 4,
-	IDENT_FUNCTION  = 9
-}
-
-enum {
-	VCLASS_GLOBAL,
-	VCLASS_LOCAL,
-	VCLASS_STATIC
-}
-
-enum E_VARIABLE {
-	Address,
-	Tag,
-	Name[32],
-	Dimensions,
-	DimensionSize[3]
-}
-
-enum E_FUNCTION {
-	Address,
-	Name[48]
-}
-
-enum E_TAG {
-	Tag,
-	Name[32]
-}
-
-static
-	s_Variables[MAX_GLOBAL_VARIABLES][E_VARIABLE],
-	s_Functions[MAX_FUNCTIONS][E_FUNCTION],
-//	s_Tags[MAX_TAGS][E_TAG],
-	
-	s_NumVariables,
-	s_NumFunctions
-//	s_NumTags
-;
-
 stock IntrospectInit() {
+	static s_initialized = false;
+	
+	if (s_initialized) {
+		return true;
+	} else {
+		s_initialized = true;
+	}
+	
 	new File:fp = fopen(s_AmxName, io_read);
-	// Try some more versions based on Y_Less' tool:
-	{
+	
+	// Try some more versions based on Y_Less' tool: http://forum.sa-mp.com/showthread.php?t=458669
+	if (!fp) {
 		static const s_ServerDir[] = "DANGEROUS_SERVER_ROOT/";
 		static const s_ModeDirs[][] = {
 			"gamemodes/",
@@ -91,194 +60,43 @@ stock IntrospectInit() {
 			if ((fp = fopen(path))) break;
 		}
 	}
-	
+
 	if (!fp) {
 		printf("(introspect.inc) Unable to open \"%s\"", s_AmxName);
-		
+
 		return false;
 	}
 	
-	// Go to the end of the AMX (0 contains the size excluding debug information)
-	fseek(fp, freadcell(fp));
-	
-	new size         = freadcell(fp);
-	new magic        = freadshort(fp);
-	new file_version = freadbyte(fp);
-	new amx_version  = freadbyte(fp);
-	new flags        = freadshort(fp);
-	new num_files    = freadshort(fp);
-	new num_lines    = freadshort(fp);
-	new num_symbols  = freadshort(fp);
-	new num_tags     = freadshort(fp);
-	new num_machines = freadshort(fp);
-	new num_states   = freadshort(fp);
-	
-	#pragma unused num_states, num_machines, num_tags, flags, amx_version, file_version, magic, size
-	
-	// Skip the file table
-	for (new i = 0; i < num_files; i++) {
-		fseek(fp, 4, seek_current);
-		while (freadbyte(fp)) {}
-	}
-	
-	// Skip the line table
-	fseek(fp, num_lines * 8, seek_current);
-	
-	// Read the symbol table
-	for (new i = 0; i < num_symbols; i++) {
-		new address = freadcell(fp);
-		new tag = freadshort(fp);
-		new codestart = freadcell(fp);
-		new codeend = freadcell(fp);
-		new ident = freadbyte(fp);
-		new vclass = freadbyte(fp);
-		new dim = freadshort(fp);
-		new name[48]; freadstr(fp, name);
-		new dim_size[4];
-		
-		#pragma unused codestart, codeend
-		
-		for (new j = 0; j < dim; j++) {
-			freadshort(fp);
-			
-			dim_size[j] = freadcell(fp);
-		}
-		
-		if (vclass != VCLASS_GLOBAL) {
-			continue;
-		}
-		
-		switch (ident) {
-			case IDENT_VARIABLE,
-			     IDENT_ARRAY: {
-				s_Variables[s_NumVariables][Address] = address;
-				s_Variables[s_NumVariables][Tag] = tag;
-				s_Variables[s_NumVariables][Dimensions] = dim;
-				s_Variables[s_NumVariables][DimensionSize][0] = dim_size[0];
-				s_Variables[s_NumVariables][DimensionSize][1] = dim_size[1];
-				s_Variables[s_NumVariables][DimensionSize][2] = dim_size[2];
-				strunpack(s_Variables[s_NumVariables][Name], name, 32);
-				
-				s_NumVariables++;
-			}
-			
-			case IDENT_FUNCTION: {
-				s_Functions[s_NumFunctions][Address] = address;
-				strunpack(s_Functions[s_NumFunctions][Name], name, 48);
-				
-				s_NumFunctions++;
-			}
-		}
-	}
-	
+	ReadAmxDebugData(fp);
 	
 	fclose(fp);
 	
-	return true;
+	return (s_initialized = true);
 }
 
-stock GetFunctionAddress(const name[]) {
-	for (new i = 0; i < s_NumFunctions; i++) {
-		if (!strcmp(name, s_Functions[i][Name])) {
-			return s_Functions[i][Address];
+static DereferenceArray(addr, dimensions, ...) {
+	new resolve = numargs() - 3;
+	
+	for (new i = 0; i <= resolve; i++) {
+		new idx = getarg(2 + i);
+	
+		if (i + 1 >= dimensions) {
+			#emit LOAD.S.pri idx
+			#emit LOAD.S.alt addr
+			#emit IDXADDR
+			#emit STOR.S.pri addr
+		} else {
+			#emit LOAD.S.pri idx
+			#emit LOAD.S.alt addr
+			#emit IDXADDR
+			#emit MOVE.alt
+			#emit LOAD.I
+			#emit ADD
+			#emit STOR.S.pri addr
 		}
 	}
 	
-	return -1;
-}
-
-stock GetVariableInfo(const name[], info[E_VARIABLE]) {
-	new sym[32], idx = 0, deref = 0, deref_idx[3];
-	
-	if (!ReadSymbol(name, idx, sym)) {
-		return false;
-	}
-	
-	SkipSpaces(name, idx);
-	
-	while (name[idx] == '[' && deref < 3) {
-		new type;
-		
-		idx++, SkipSpaces(name, idx);
-		
-		if (!ReadNumber(name, idx, deref_idx[deref], type)) {
-			return false;
-		}
-		
-		SkipSpaces(name, idx);
-		
-		if (name[idx++] != ']') {
-			return false;
-		}
-		
-		deref++;
-	}
-	
-	for (new i = 0; i < s_NumVariables; i++) {
-		if (!strcmp(sym, s_Variables[i][Name])) {
-			info[Address] = s_Variables[i][Address];
-			info[Tag] = s_Variables[i][Tag];
-			info[Dimensions] = s_Variables[i][Dimensions];
-			info[DimensionSize][0] = s_Variables[i][DimensionSize][0];
-			info[DimensionSize][1] = s_Variables[i][DimensionSize][1];
-			info[DimensionSize][2] = s_Variables[i][DimensionSize][2];
-			strunpack(info[Name], s_Variables[i][Name], 32);
-			
-			if (deref) {
-				info[Dimensions] -= 1;
-				info[DimensionSize][0] = info[DimensionSize][1];
-				info[DimensionSize][1] = info[DimensionSize][2];
-				info[DimensionSize][2] = 0;
-				
-				info[Address] += deref_idx[--deref] * 4;
-			}
-			
-			return true;
-		}
-	}
-	
-	return false;
-}
-
-// Read a single cell
-static freadcell(File:fp) {
-	new buf[1];
-	
-	fblockread(fp, buf);
-	
-	return buf[0];
-}
-
-// Read a 16-bit integer
-static freadshort(File:fp) {
-	new buf[1];
-	
-	fblockread(fp, buf);
-	fseek(fp, -2, seek_current);
-	
-	return buf[0] & 0xFFFF;
-}
-
-// Read a single byte
-static freadbyte(File:fp) {
-	return fgetchar(fp, 0, false);
-}
-
-// Read a zero-terminated string
-static freadstr(File:fp, buf[], maxlength = sizeof(buf)) {
-	new i = 0, c;
-	
-	buf[i] = '\0';
-	
-	while ((c = fgetchar(fp, 0))) {
-		if (i + 1 < maxlength) {
-			buf[i++] = c;
-		}
-	}
-	
-	buf[i] = '\0';
-	
-	return i;
+	return addr;
 }
 
 static ReadSymbol(const input[], &index, output[], maxlength = sizeof(output)) {
@@ -420,6 +238,42 @@ static ReadNumber(const input[], &index, &output, &type) {
 	return true;
 }
 
+static ReadArrayIndexes(info[E_VARIABLE], const input[], &index) {
+	SkipSpaces(input, index);
+	
+	while (input[index] == '[') {
+		index++, SkipSpaces(input, index);
+		
+		new idx, type;
+		
+		if (!ReadNumber(input, index, idx, type) || type != 'i') {
+			return false;
+		}
+		
+		info[Address] = DereferenceArray(info[Address], info[Dimensions], idx);
+		
+		info[Dimensions]--;
+		
+		info[DimensionSize][0] = info[DimensionSize][1];
+		info[DimensionSize][1] = info[DimensionSize][2];
+		info[DimensionSize][2] = 0;
+		
+		info[DimensionTag][0] = info[DimensionTag][1];
+		info[DimensionTag][1] = info[DimensionTag][2];
+		info[DimensionTag][2] = 0;
+		
+		SkipSpaces(input, index);
+		
+		if (input[index] == ']') {
+			index++, SkipSpaces(input, index);
+		} else {
+			return false;
+		}
+	}
+	
+	return true;
+}
+
 static SkipSpaces(const buf[], &index) {
 	while ('\0' < buf[index] <= ' ') {
 		index++;
@@ -433,8 +287,12 @@ static GetVariableAddress(...) {
 	return 0;
 }
 
-stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)) {
+stock RunSimpleStatement(const statement[], &output_type = 0, output[] = {0}, outlen = sizeof(output), error[] = "", errlen = sizeof(error)) {
+	IntrospectInit();
+	
 	new sym[32], idx = 0, start_idx;
+	
+	#pragma unused outlen
 	
 	SkipSpaces(statement, idx);
 	
@@ -451,13 +309,31 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 	if (statement[idx] == '=' || statement[idx] == '[') {
 		new info[E_VARIABLE];
 		
-		if (!GetVariableInfo(statement[start_idx], info)) {
+		if (!GetVariableInfo(sym, info)) {
 			format(error, errlen, "Invalid variable: %s", sym);
 			
 			return false;
 		}
 		
-		idx++, SkipSpaces(statement, idx);
+		if (statement[idx] == '[') {
+			if (!ReadArrayIndexes(info, statement, idx)) {
+				format(error, errlen, "Failed to read array subscripts");
+				
+				return false;
+			}
+			
+			SkipSpaces(statement, idx);
+		}
+		
+		if (statement[idx] != '=') {
+			format(error, errlen, "Expected \"=\"");
+			
+			return false;
+		}
+		
+		idx++;
+		
+		SkipSpaces(statement, idx);
 		
 		switch (statement[idx]) {
 			case '"': {
@@ -512,7 +388,7 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 	} else if (statement[idx] == '(') {
 		idx++;
 		
-		new addr = 0;
+		new addr = 0, info[E_FUNCTION];
 		
 		#if defined INTROSPECT_NATIVES
 			new is_native = false;
@@ -522,8 +398,12 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 			}
 		#endif
 			
-		if (addr == -1) {
-			addr = GetFunctionAddress(sym);
+		if (addr == -1 && GetFunctionInfo(sym, info)) {
+			addr = info[Address];
+			
+			if (info[DimensionSize] != 0) {
+				format(error, errlen, "Functions that return arrays are not yet supported (%s)", sym);
+			}
 		}
 		
 		if (addr == -1) {
@@ -635,6 +515,7 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 		#endif
 		
 		new value, arg_bytes = args * 4;
+		new retval;
 		
 		while (--args >= 0) {
 			value = arg[args];
@@ -648,6 +529,15 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 		#emit PUSH.pri
 		#emit LOAD.S.pri addr
 		#emit SCTRL 6
+		#emit STOR.S.pri retval
+		
+		output[0] = retval;
+		
+		if (!strcmp("Float", GetTagName(info[Tag]))) {
+			output_type = 'f';
+		} else {
+			output_type = 'i';
+		}
 		
 		return true;
 	}
@@ -656,5 +546,3 @@ stock RunSimpleStatement(const statement[], error[] = "", errlen = sizeof(error)
 	
 	return false;
 }
-
-//#pragma unused GetVariableAddress, ReadString, freadbyte, freadcell, freadshort, freadstr

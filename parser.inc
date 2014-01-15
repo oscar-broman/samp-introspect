@@ -1217,3 +1217,4 @@ static stock Parser_InsertString(str[])
 	while ((ISI_gInputLine[ISI_gsStringEnd++] = str[idx++])) {}
 	return i;
 }
+

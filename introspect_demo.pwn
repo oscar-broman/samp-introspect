@@ -7,16 +7,26 @@
 new g_LocalVariable = 5;
 new Float:g_LocalArray[123][456];
 
-forward _funcinc_introspect();
-public _funcinc_introspect() {
-	SomeFunction(0, 0.0, "");
-}
-
 SomeFunction(int, Float:flt, str[]) {
 	printf("args: %d", numargs());
 	printf("int: %d", int);
 	printf("flt: %f", flt);
 	printf("str: %s", str);
+}
+
+Float:ReturnFloat() {
+	return 123.456;
+}
+
+ReturnInt() {
+	return 555;
+}
+
+forward _funcinc_introspect();
+public _funcinc_introspect() {
+	SomeFunction(0, 0.0, "");
+	ReturnFloat();
+	ReturnInt();
 }
 
 new g_TestString[128] = "hello world";
@@ -43,6 +53,13 @@ main() {
 	RunSimpleStatement("SomeFunction(123, 456.678, \"hellooooo!\")");
 	RunSimpleStatement("printf(\"hello %s %f.\", \"world\", &12.34)");
 	RunSimpleStatement("SendRconCommand(\"echo hello from rcon!\")");
+	
+	new type, output[1];
+	
+	RunSimpleStatement("ReturnFloat()", type, output);
+	printf("return (%c): %f", type, output[0]);
+	RunSimpleStatement("ReturnInt()", type, output);
+	printf("return (%c): %d", type, output[0]);
 	
 	// ---------------------------------
 	// Advanced usage
@@ -73,25 +90,17 @@ main() {
 		print("Variable not found.");
 	}
 	
-	new address = GetFunctionAddress("SomeFunction");
-	
-	if (address) {
-		print("SomeFunction");
-		printf("  Address: %08x", address);
-	} else {
-		print("Function not found.");
-	}
-	
-	g_TestArray[3] = 123;
-	g_TestArray2[7][8] = 456;
+	g_TestArray[3] = 11;
+	g_TestArray2[7][8] = 22;
 	
 	printf("%d, %d", g_TestArray[3], g_TestArray2[7][8]);
 	
-	//GetVariableInfo("g_TestArray[3]", info);
-	//GetVariableInfo("g_TestArray2[7][8]", info);
-	
-	RunSimpleStatement("g_TestArray[3] = 5");
+	RunSimpleStatement("g_TestArray[3] = 33");
+	RunSimpleStatement("g_TestArray2[7][8] = 44");
 	
 	printf("%d, %d", g_TestArray[3], g_TestArray2[7][8]);
+	
+	new Float:asd;
+	printf("%08x",tagof(asd));
 }
 
