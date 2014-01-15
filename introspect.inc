@@ -27,6 +27,9 @@
 	
 	#tryinclude "amx_assembly\dynamic_call"
 	#tryinclude "amx\dynamic_call"
+	
+	#tryinclude <amx_assembly\dynamic_call>
+	#tryinclude <amx\dynamic_call>
 
 	#if !defined CallNative
 		#error amx_assembly is required. Get it here: github.com/Zeex/amx_assembly
