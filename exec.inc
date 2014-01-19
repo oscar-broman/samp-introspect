@@ -45,7 +45,7 @@ static stock MI(t, token[E_TOKEN])
 	switch (t)
 	{
 		// Int constant.
-		case 0b00: return token[E_TOKEN_NUM_VAL]);
+		case 0b00: return token[E_TOKEN_NUM_VAL];
 		// Float constant.
 		case 0b01: return floatround(token[E_TOKEN_FLOAT_VAL]);
 		// Int variable.
@@ -53,23 +53,7 @@ static stock MI(t, token[E_TOKEN])
 		// Float variable.
 		case 0b11: return floatround(Float:Exec_LoadAddress(token[E_TOKEN_SYM_PTR]));
 	}
-	return cellmin; // Almost NAN...
-}
-
-static stock Exec_ResolveTag(token[E_TOKEN], &value)
-{
-	switch (token[E_TOKEN_TYPE])
-	{
-		case e_TOKEN_TYPE_NUM:
-			return value =   token[E_TOKEN_NUM_VAL],   0b00;
-		case e_TOKEN_TYPE_VAR:
-			return value =   token[E_TOKEN_SYM_PTR],   0b10;
-		case e_TOKEN_TYPE_FLOAT:
-			return value = _:token[E_TOKEN_FLOAT_VAL], 0b01;
-		case e_TOKEN_TYPE_FVAR:
-			return value =   token[E_TOKEN_SYM_PTR],   0b11;
-	}
-	return -1;
+	return cellmin; // Almost NAN.
 }
 
 static stock bool:Exec_CheckTags(l[E_TOKEN], r[E_TOKEN])
@@ -97,12 +81,8 @@ static stock bool:Exec_CheckTags(l[E_TOKEN], r[E_TOKEN])
 	return true;
 }
 
-static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr, e_TOKEN_TYPE:boolRet = e_TOKEN_TYPE:0)
+static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr)
 {
-	// When "boolRet" is "e_TOKEN_TYPE:1", return types are converted to just
-	// "e_TOKEN_TYPE_BOOL" from their original values.  This is done by shifting
-	// the values, and ensuring that any shifts from different start points end
-	// up with the same result (we discard information on purpose).
 	switch (l[E_TOKEN_TYPE])
 	{
 		case e_TOKEN_TYPE_VAR  : switch (r[E_TOKEN_TYPE])
@@ -118,7 +98,7 @@ static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr, e_T
 			case e_TOKEN_TYPE_BOOL : return
 				lr = Exec_LoadAddress(l[E_TOKEN_SYM_PTR]),
 				rr = _:r[E_TOKEN_BOOL_VAL],
-				e_TOKEN_TYPE_NUM >>> boolRet;
+				e_TOKEN_TYPE_NUM;
 			case e_TOKEN_TYPE_FLOAT: return
 				lr = _:float(Exec_LoadAddress(l[E_TOKEN_SYM_PTR])),
 				rr = _:r[E_TOKEN_FLOAT_VAL],
@@ -141,7 +121,7 @@ static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr, e_T
 			case e_TOKEN_TYPE_BOOL : return
 				lr = l[E_TOKEN_NUM_VAL],
 				rr = _:r[E_TOKEN_BOOL_VAL],
-				e_TOKEN_TYPE_NUM >>> boolRet;
+				e_TOKEN_TYPE_NUM;
 			case e_TOKEN_TYPE_FLOAT: return
 				lr = _:float(l[E_TOKEN_NUM_VAL]),
 				rr = _:r[E_TOKEN_FLOAT_VAL],
@@ -156,23 +136,23 @@ static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr, e_T
 			case e_TOKEN_TYPE_VAR  : return
 				lr = _:l[E_TOKEN_BOOL_VAL],
 				rr = Exec_LoadAddress(r[E_TOKEN_SYM_PTR]),
-				e_TOKEN_TYPE_NUM >>> boolRet;
+				e_TOKEN_TYPE_NUM;
 			case e_TOKEN_TYPE_NUM  : return
 				lr = _:l[E_TOKEN_BOOL_VAL],
 				rr = r[E_TOKEN_NUM_VAL],
-				e_TOKEN_TYPE_NUM >>> boolRet;
+				e_TOKEN_TYPE_NUM;
 			case e_TOKEN_TYPE_BOOL : return
 				lr = _:l[E_TOKEN_BOOL_VAL],
 				rr = _:r[E_TOKEN_BOOL_VAL],
-				e_TOKEN_TYPE_BOOL;
+				e_TOKEN_TYPE_NUM;
 			case e_TOKEN_TYPE_FLOAT: return
 				lr = _:float(_:l[E_TOKEN_BOOL_VAL]),
 				rr = _:r[E_TOKEN_FLOAT_VAL],
-				e_TOKEN_TYPE_FLOAT >>> boolRet;
+				e_TOKEN_TYPE_FLOAT;
 			case e_TOKEN_TYPE_FVAR : return
 				lr = _:float(_:l[E_TOKEN_BOOL_VAL]),
 				rr = _:Float:Exec_LoadAddress(r[E_TOKEN_SYM_PTR]),
-				e_TOKEN_TYPE_FLOAT >>> boolRet;
+				e_TOKEN_TYPE_FLOAT;
 		}
 		case e_TOKEN_TYPE_FLOAT: switch (r[E_TOKEN_TYPE])
 		{
@@ -187,7 +167,7 @@ static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr, e_T
 			case e_TOKEN_TYPE_BOOL : return
 				lr = _:l[E_TOKEN_FLOAT_VAL],
 				rr = _:float(_:r[E_TOKEN_BOOL_VAL]),
-				e_TOKEN_TYPE_FLOAT >>> boolRet;
+				e_TOKEN_TYPE_FLOAT;
 			case e_TOKEN_TYPE_FLOAT: return
 				lr = _:l[E_TOKEN_FLOAT_VAL],
 				rr = _:r[E_TOKEN_FLOAT_VAL],
@@ -210,7 +190,7 @@ static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr, e_T
 			case e_TOKEN_TYPE_BOOL : return
 				lr = _:Float:Exec_LoadAddress(l[E_TOKEN_SYM_PTR]),
 				rr = _:float(_:r[E_TOKEN_BOOL_VAL]),
-				e_TOKEN_TYPE_FLOAT >>> boolRet;
+				e_TOKEN_TYPE_FLOAT;
 			case e_TOKEN_TYPE_FLOAT: return
 				lr = _:Float:Exec_LoadAddress(l[E_TOKEN_SYM_PTR]),
 				rr = _:r[E_TOKEN_FLOAT_VAL],
@@ -224,25 +204,60 @@ static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr, e_T
 	return e_TOKEN_TYPE_NONE;
 }
 
-#define EXEC_OP(%0\32;%9\32;%1) switch(Exec_ResolveTags(%0,%1,lr,rr)) { \
-	case e_TOKEN_TYPE_FLOAT:ret[E_TOKEN_TYPE]=e_TOKEN_TYPE_FLOAT,ret[E_TOKEN_FLOAT_VAL]=(Float:lr)%9(Float:rr); \
+static stock e_TOKEN_TYPE:Exec_ResolveBool(l[E_TOKEN], r[E_TOKEN], &lr, &rr)
+{
+	switch (l[E_TOKEN_TYPE])
+	{
+		case e_TOKEN_TYPE_VAR  :
+			lr = Exec_LoadAddress(l[E_TOKEN_SYM_PTR]);
+		case e_TOKEN_TYPE_NUM  :
+			lr = l[E_TOKEN_NUM_VAL];
+		case e_TOKEN_TYPE_BOOL :
+			lr = _:l[E_TOKEN_BOOL_VAL];
+		case e_TOKEN_TYPE_FLOAT:
+			lr = _:l[E_TOKEN_FLOAT_VAL];
+		case e_TOKEN_TYPE_FVAR :
+			lr = _:Float:Exec_LoadAddress(l[E_TOKEN_SYM_PTR]);
+		default:
+			return e_TOKEN_TYPE_NONE;
+	}
+	switch (r[E_TOKEN_TYPE])
+	{
+		case e_TOKEN_TYPE_VAR  :
+			rr = Exec_LoadAddress(r[E_TOKEN_SYM_PTR]);
+		case e_TOKEN_TYPE_NUM  :
+			rr = r[E_TOKEN_NUM_VAL];
+		case e_TOKEN_TYPE_BOOL :
+			rr = _:r[E_TOKEN_BOOL_VAL];
+		case e_TOKEN_TYPE_FLOAT:
+			rr = _:r[E_TOKEN_FLOAT_VAL];
+		case e_TOKEN_TYPE_FVAR :
+			rr = _:Float:Exec_LoadAddress(r[E_TOKEN_SYM_PTR]);
+		default:
+			return e_TOKEN_TYPE_NONE;
+	}
+	return e_TOKEN_TYPE_BOOL;
+}
+
+#define EXEC_OP(%0\32;%9\32;%1,%7) switch(Exec_ResolveTags(%0,%1,lr,rr)) { \
+	case e_TOKEN_TYPE_FLOAT:ret[E_TOKEN_TYPE]=e_TOKEN_TYPE_FLOAT,ret[E_TOKEN_FLOAT_VAL]=%7((Float:lr),(Float:rr)); \
 	case e_TOKEN_TYPE_NUM:ret[E_TOKEN_TYPE]=e_TOKEN_TYPE_NUM,ret[E_TOKEN_NUM_VAL]=lr%9rr; \
 	default:Parser_Error("Incompatible operands.");}
 
-#define EXEC_CMP(%0\32;%9\32;%1) switch(Exec_ResolveTags(%0,%1,lr,rr)) { \
-	case e_TOKEN_TYPE_FLOAT:ret[E_TOKEN_TYPE]=e_TOKEN_TYPE_BOOL,ret[E_TOKEN_BOOL_VAL]=(Float:lr)%9(Float:rr); \
+#define EXEC_CMP(%0\32;%9\32;%1,%7) switch(Exec_ResolveTags(%0,%1,lr,rr)) { \
+	case e_TOKEN_TYPE_FLOAT:ret[E_TOKEN_TYPE]=e_TOKEN_TYPE_BOOL,ret[E_TOKEN_BOOL_VAL]=%7((Float:lr),(Float:rr)); \
 	case e_TOKEN_TYPE_NUM:ret[E_TOKEN_TYPE]=e_TOKEN_TYPE_BOOL,ret[E_TOKEN_BOOL_VAL]=lr%9rr; \
 	default:Parser_Error("Incompatible operands.");}
 
-#define EXEC_BOOL(%0\32;%9\32;%1) if(Exec_CheckTags(%0,%1)) \
-	ret[E_TOKEN_TYPE]=e_TOKEN_TYPE_BOOL,ret[E_TOKEN_BOOL_VAL]=%0[E_TOKEN_BOOL_VAL]%9%1[E_TOKEN_BOOL_VAL]; \
+#define EXEC_BOOL(%0\32;%9\32;%1) if(Exec_ResolveBool(%0,%1,lr,rr)==e_TOKEN_TYPE_BOOL) \
+	ret[E_TOKEN_TYPE]=e_TOKEN_TYPE_BOOL,ret[E_TOKEN_BOOL_VAL]=(bool:lr)%9(bool:rr); \
 	else Parser_Error("Incompatible operands.");
 
 #define EXEC_INT(%0\32;%9\32;%1) if(Exec_CheckTags(%0,%1)) \
 	ret[E_TOKEN_TYPE]=e_TOKEN_TYPE_NUM,ret[E_TOKEN_NUM_VAL]=%0[E_TOKEN_NUM_VAL]%9%1[E_TOKEN_NUM_VAL]; \
 	else Parser_Error("Incompatible operands.");
 
-/*static*/stock Exec_ExecToken(t[E_TOKEN], l[E_TOKEN], r[E_TOKEN])
+/*static*/ stock Exec_ExecToken(t[E_TOKEN], l[E_TOKEN], r[E_TOKEN])
 {
 	static lr, rr;
 	new
@@ -250,52 +265,54 @@ static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr, e_T
 	switch (t[E_TOKEN_TYPE])
 	{
 		case e_TOKEN_TYPE_NONE     : {}
-		case e_TOKEN_TYPE_STRING   : TODO
+		case e_TOKEN_TYPE_STRING   : TODO:
 		case e_TOKEN_TYPE_FLOAT    : ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FLOAT, ret[E_TOKEN_FLOAT_VAL] = t[E_TOKEN_FLOAT_VAL];
 		// These two are distinct for simplicity.
-		case e_TOKEN_TYPE_NATIVE   : TODO
-		case e_TOKEN_TYPE_FUNC     : TODO
-		case e_TOKEN_TYPE_VAR      : TODO
+		case e_TOKEN_TYPE_NATIVE   : TODO:
+		case e_TOKEN_TYPE_FUNC     : TODO:
+		case e_TOKEN_TYPE_VAR      : TODO:
 		case e_TOKEN_TYPE_NUM      : ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NUM, ret[E_TOKEN_NUM_VAL] = t[E_TOKEN_NUM_VAL];
 		case e_TOKEN_TYPE_BOOL     : ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_BOOL, ret[E_TOKEN_BOOL_VAL] = t[E_TOKEN_BOOL_VAL];
 		case e_TOKEN_TYPE_OP       : switch (t[E_TOKEN_OP])
 		{
+			// Float version is reversed.
 			case e_TOKEN_OP_EQUALS : // '=='
-				EXEC_CMP(l == r)
+				EXEC_CMP(l == r, 0 == floatcmp)
 			case e_TOKEN_OP_LTE    : // '<='
-				EXEC_CMP(l <= r)
+				EXEC_CMP(l <= r, 0 >= floatcmp)
 			case e_TOKEN_OP_GTE    : // '>='
-				EXEC_CMP(l >= r)
+				EXEC_CMP(l >= r, 0 <= floatcmp)
 			case e_TOKEN_OP_LESS   : // '<'
-				EXEC_CMP(l < r)
+				EXEC_CMP(l < r,  0 >  floatcmp)
 			case e_TOKEN_OP_GREATER: // '>'
-				EXEC_CMP(l > r)
+				EXEC_CMP(l > r,  0 <  floatcmp)
 			case e_TOKEN_OP_NEQ    : // '!='
-				EXEC_CMP(l != r)
-			// case e_TOKEN_OP_NOT : // '!'
-				// EXEC_OP(l ! r)
-			// case e_TOKEN_OP_SUB : // '-'
-				// EXEC_OP(l - r)
+				EXEC_CMP(l != r, 0 != floatcmp)
+			case e_TOKEN_OP_SUB : // '-'
+			{
+				TODO: Check for unary minus.
+				EXEC_OP(l - r, floatsub)
+			}
 			case e_TOKEN_OP_ADD    : // '+'
-				EXEC_OP(l + r)
+				EXEC_OP(l + r, floatadd)
 			case e_TOKEN_OP_MUL    : // '*'
-				EXEC_OP(l * r)
+				EXEC_OP(l * r, floatmul)
 			case e_TOKEN_OP_DIV    : // '/'
-				EXEC_OP(l / r)
+				EXEC_OP(l / r, floatdiv)
 			// case e_TOKEN_OP_MOD : // '%'
 				// EXEC_OP(l % r)
-			case e_TOKEN_OP_XOR    : // '^'
-				EXEC_INT(l ^ r)
-			case e_TOKEN_OP_LAND   : // '&'
-				EXEC_INT(l & r)
-			case e_TOKEN_OP_LOR    : // '|'
-				EXEC_INT(l | r)
-			case e_TOKEN_OP_RSHIFT : // '>>'
-				EXEC_INT(l >> r)
-			case e_TOKEN_OP_SHIFT  : // '>>>'
-				EXEC_INT(l >>> r)
-			case e_TOKEN_OP_LSHIFT : // '<<'
-				EXEC_INT(l << r)
+			// case e_TOKEN_OP_XOR    : // '^'
+				// EXEC_INT(l ^ r)
+			// case e_TOKEN_OP_LAND   : // '&'
+				// EXEC_INT(l & r)
+			// case e_TOKEN_OP_LOR    : // '|'
+				// EXEC_INT(l | r)
+			// case e_TOKEN_OP_RSHIFT : // '>>'
+				// EXEC_INT(l >> r)
+			// case e_TOKEN_OP_SHIFT  : // '>>>'
+				// EXEC_INT(l >>> r)
+			// case e_TOKEN_OP_LSHIFT : // '<<'
+				// EXEC_INT(l << r)
 			case e_TOKEN_OP_AND    : // '&&'
 				EXEC_BOOL(l && r)
 			case e_TOKEN_OP_OR     : // '||'
@@ -323,21 +340,96 @@ static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr, e_T
 
 main()
 {
+	// These should all print "1".
 	new
-		l [E_TOKEN],
-		r [E_TOKEN],
-		op[E_TOKEN];
-	l  = MAKE_TOKEN(e_TOKEN_TYPE_NUM, 42),
-	r  = MAKE_TOKEN(e_TOKEN_TYPE_NUM, 11),
-	op = MAKE_TOKEN(e_TOKEN_TYPE_OP, e_TOKEN_OP_ADD);
+		l  [E_TOKEN],
+		r  [E_TOKEN],
+		op [E_TOKEN],
+		res[E_TOKEN];
 	
+	MAKE_TOKEN(l, e_TOKEN_TYPE_NUM, 42),
+	MAKE_TOKEN(r, e_TOKEN_TYPE_NUM, 11),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_ADD),
+	res = Exec_ExecToken(op, l, r);
+	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_NUM, 53}));
 	
+	MAKE_TOKEN(l, e_TOKEN_TYPE_NUM, 42),
+	MAKE_TOKEN(r, e_TOKEN_TYPE_NUM, 0),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_MUL),
+	res = Exec_ExecToken(op, l, r);
+	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_NUM, 0}));
 	
+	MAKE_TOKEN(l, e_TOKEN_TYPE_NUM, 42),
+	MAKE_TOKEN(r, e_TOKEN_TYPE_NUM, 11),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_MUL),
+	res = Exec_ExecToken(op, l, r);
+	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_NUM, 462}));
 	
+	MAKE_TOKEN(l, e_TOKEN_TYPE_NUM, 42),
+	MAKE_TOKEN(r, e_TOKEN_TYPE_NUM, 0),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_ADD),
+	res = Exec_ExecToken(op, l, r);
+	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_NUM, 42}));
 	
-	l  = MAKE_TOKEN(e_TOKEN_TYPE_NUM, 42),
-	r  = MAKE_TOKEN(e_TOKEN_TYPE_NUM, 11),
-	op = MAKE_TOKEN(e_TOKEN_TYPE_OP, e_TOKEN_OP_ADD);
+	MAKE_TOKEN(l, e_TOKEN_TYPE_NUM, 42),
+	MAKE_TOKEN(r, e_TOKEN_TYPE_FLOAT, _:11.0),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_ADD),
+	res = Exec_ExecToken(op, l, r);
+	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_FLOAT, _:53.0}));
+	
+	MAKE_TOKEN(l, e_TOKEN_TYPE_NUM, 42),
+	MAKE_TOKEN(r, e_TOKEN_TYPE_FLOAT, _:0.0),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_ADD),
+	res = Exec_ExecToken(op, l, r);
+	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_FLOAT, _:42.0}));
+	
+	MAKE_TOKEN(l, e_TOKEN_TYPE_NUM, 42),
+	MAKE_TOKEN(r, e_TOKEN_TYPE_FLOAT, _:0.0),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_EQUALS),
+	res = Exec_ExecToken(op, l, r);
+	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_BOOL, _:false}));
+	
+	MAKE_TOKEN(l, e_TOKEN_TYPE_NUM, 42),
+	MAKE_TOKEN(r, e_TOKEN_TYPE_FLOAT, _:42.0),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_EQUALS),
+	res = Exec_ExecToken(op, l, r);
+	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_BOOL, _:true}));
+	
+	MAKE_TOKEN(l, e_TOKEN_TYPE_NUM, 555),
+	MAKE_TOKEN(r, e_TOKEN_TYPE_NUM, 101),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_GREATER),
+	res = Exec_ExecToken(op, l, r);
+	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_BOOL, _:true}));
+	
+	MAKE_TOKEN(l, e_TOKEN_TYPE_NUM, 65),
+	MAKE_TOKEN(r, e_TOKEN_TYPE_NUM, 101),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_GREATER),
+	res = Exec_ExecToken(op, l, r);
+	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_BOOL, _:false}));
+	
+	MAKE_TOKEN(l, e_TOKEN_TYPE_NUM, 65),
+	MAKE_TOKEN(r, e_TOKEN_TYPE_NUM, 0),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_AND),
+	res = Exec_ExecToken(op, l, r);
+	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_BOOL, _:false}));
+	
+	MAKE_TOKEN(l, e_TOKEN_TYPE_NUM, 65),
+	MAKE_TOKEN(r, e_TOKEN_TYPE_NUM, 0),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_OR),
+	res = Exec_ExecToken(op, l, r);
+	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_BOOL, _:true}));
+	
+	MAKE_TOKEN(l, e_TOKEN_TYPE_NUM, 65),
+	MAKE_TOKEN(r, e_TOKEN_TYPE_NUM, 33),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_AND),
+	res = Exec_ExecToken(op, l, r);
+	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_BOOL, _:true}));
+	
+	MAKE_TOKEN(l, e_TOKEN_TYPE_NUM, 0),
+	MAKE_TOKEN(r, e_TOKEN_TYPE_NUM, 0),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_OR),
+	res = Exec_ExecToken(op, l, r);
+	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_BOOL, _:false}));
 }
 
 #endif

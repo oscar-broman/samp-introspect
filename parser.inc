@@ -4,7 +4,7 @@
 // Tokeniser.  Read text and convert it to tokens for simple processing.
 
 #if !defined TODO
-	#define TODO { new Todo; }
+	#define TODO:%9\32;%0\10;%1 { new TODO; print("TODO: \"%0\""); }
 #endif
 
 enum e_TOKEN_OP
@@ -67,20 +67,20 @@ enum e_TOKEN_OP
 
 enum e_TOKEN_TYPE
 {
-	e_TOKEN_TYPE_NONE   = 0,
-	e_TOKEN_TYPE_STRING = 1,
+	e_TOKEN_TYPE_NONE,
+	e_TOKEN_TYPE_STRING,
 	// These two are distinct for simplicity.
-	e_TOKEN_TYPE_NATIVE = 2,
-	e_TOKEN_TYPE_FUNC   = 3,
-	e_TOKEN_TYPE_BOOL   = 4,
+	e_TOKEN_TYPE_NATIVE,
+	e_TOKEN_TYPE_FUNC,
 	// This makes the code quite context-aware.
-	e_TOKEN_TYPE_FVAR   = 5, // Float variable.
-	e_TOKEN_TYPE_VAR    = 6,  // Regular variable.
-	e_TOKEN_TYPE_OP     = 7,
-	e_TOKEN_TYPE_NUM    = 8, // 8 >> 1 == 4
-	e_TOKEN_TYPE_FLOAT  = 9, // 9 >> 1 == 4
-	e_TOKEN_TYPE_APP    = 10,
-	e_TOKEN_TYPE_ARR    = 11
+	e_TOKEN_TYPE_VAR,  // Regular variable.
+	e_TOKEN_TYPE_FVAR, // Float variable.
+	e_TOKEN_TYPE_FLOAT,
+	e_TOKEN_TYPE_BOOL,
+	e_TOKEN_TYPE_NUM,
+	e_TOKEN_TYPE_APP,
+	e_TOKEN_TYPE_ARR,
+	e_TOKEN_TYPE_OP
 }
 
 enum E_TOKEN
@@ -98,9 +98,11 @@ enum E_TOKEN
 	//_E_TOKEN_TEMP_STRING[32],
 }
 
+#define COMPARE_PARSER_TOKEN(%0,{%1,%2}) (((%0[E_TOKEN_TYPE]) == (%1)) && ((%0[E_TOKEN_NUM_VAL]) == (%2)))
 #define MAKE_PARSER_TOKEN(%0,%1,%2,%3) {%0, %1, Float:%2, bool:%3}
-#define MAKE_TOKEN(%0,%1) MAKE_PARSER_TOKEN(%0, %1, -1, -1)
-#define EMPTY_PARSER_TOKEN MAKE_TOKEN(e_TOKEN_TYPE_NONE, 0)
+#define EMPTY_PARSER_TOKEN MAKE_PARSER_TOKEN(e_TOKEN_TYPE_NONE, 0, -1, -1)
+
+#define MAKE_TOKEN(%0,%1,%2) %0[E_TOKEN_TYPE]=%1,%0[E_TOKEN_NUM_VAL]=%2,%0[E_TOKEN_LEFT]=%0[E_TOKEN_RIGHT]=-1
 
 enum E_OPERATOR_DATA
 {
@@ -698,9 +700,8 @@ static stock Parser_GetSymbol(ret[E_TOKEN])
 			ISI_gInputLine[(ISI_gInputPtr = ptr)] = tmp,
 			1;
 	}
-	// TODO: Keywords (if I want them - I'm only doing expressions ATM).
-	// TODO: Add constants:
-	TODO
+	TODO: Keywords (if I want them - I`m only doing expressions ATM).
+	TODO: Add constants.
 /*	#if defined INTROSPECT_CONSTANTS
 		if (Parser_GetConstant(ISI_gInputLine[ISI_gInputPtr], ret))
 		{
