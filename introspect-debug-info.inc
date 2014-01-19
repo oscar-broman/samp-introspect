@@ -14,6 +14,7 @@
 
 #if !defined INTROSPECT_MAX_TOTAL_ARGS
 	#define INTROSPECT_MAX_TOTAL_ARGS (INTROSPECT_MAX_FUNCTIONS * 4)
+#endif
 
 #if !defined INTROSPECT_MAX_TAGS
 	#define INTROSPECT_MAX_TAGS 512
@@ -221,28 +222,48 @@ static ReadSymbolTable(File:fp, num_symbols, bool:read_args = false) {
 	}
 }
 
-stock GetFunctionInfo(const name[], info[E_FUNCTION]) {
+stock GetFunctionIdx(const name[]) {
 	for (new i = 0; i < s_NumFunctions; i++) {
 		if (!strcmp(name, s_Functions[i][Name])) {
-			memcpy(info[E_FUNCTION:0], s_Functions[i][E_FUNCTION:0], 0, _:E_FUNCTION * 4, _:E_FUNCTION);
-			
-			return true;
+			return i;
 		}
 	}
 	
-	return false;
+	return -1;
+}
+
+stock GetVariableIdx(const name[]) {
+	for (new i = 0; i < s_NumGlobals; i++) {
+		if (!strcmp(name, s_Globals[i][Name])) {
+			return i;
+		}
+	}
+	
+	return -1;
+}
+
+stock GetFunctionInfo(const name[], info[E_FUNCTION]) {
+	new i = GetFunctionIdx(name);
+	
+	if (idx == -1) {
+		return false;
+	}
+	
+	memcpy(info[E_FUNCTION:0], s_Functions[i][E_FUNCTION:0], 0, _:E_FUNCTION * 4, _:E_FUNCTION);
+	
+	return true;
 }
 
 stock GetVariableInfo(const name[], info[E_VARIABLE]) {
-	for (new i = 0; i < s_NumGlobals; i++) {
-		if (!strcmp(name, s_Globals[i][Name])) {
-			memcpy(info[E_VARIABLE:0], s_Globals[i][E_VARIABLE:0], 0, _:E_VARIABLE * 4, _:E_VARIABLE);
-			
-			return true;
-		}
+	new i = GetVariableIdx(name);
+	
+	if (idx == -1) {
+		return false;
 	}
 	
-	return false;
+	memcpy(info[E_VARIABLE:0], s_Globals[i][E_VARIABLE:0], 0, _:E_VARIABLE * 4, _:E_VARIABLE);
+	
+	return true;
 }
 
 stock GetFunctionArgument(const func_info[E_FUNCTION], idx, info[E_VARIABLE]) {
@@ -261,6 +282,16 @@ stock GetFunctionArgument(const func_info[E_FUNCTION], idx, info[E_VARIABLE]) {
 	memcpy(info[E_VARIABLE:0], s_Arguments[arg][E_VARIABLE:0], 0, _:E_VARIABLE * 4, _:E_VARIABLE);
 	
 	return true;
+}
+
+stock GetTagIdx(const name[]) {
+	for (new i = 0; i < s_NumTags; i++) {
+		if (!strcmp(name, s_Tags[i][Name])) {
+			return s_Tags[i][Tag] | 0xC0000000;
+		}
+	}
+	
+	return -1;
 }
 
 stock GetTagName(tag) {

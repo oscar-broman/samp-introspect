@@ -65,13 +65,14 @@ enum e_TOKEN_TYPE
 {
 	e_TOKEN_TYPE_NONE,
 	e_TOKEN_TYPE_STRING,
-	e_TOKEN_TYPE_FLOAT,
 	// These two are distinct for simplicity.
 	e_TOKEN_TYPE_NATIVE,
 	e_TOKEN_TYPE_FUNC,
-	e_TOKEN_TYPE_VAR,
+	e_TOKEN_TYPE_VAR,  // Normal variable.
+	e_TOKEN_TYPE_FVAR, // Float variable.
 	e_TOKEN_TYPE_NUM,
 	e_TOKEN_TYPE_BOOL,
+	e_TOKEN_TYPE_FLOAT,
 	e_TOKEN_TYPE_OP,
 	e_TOKEN_TYPE_APP,
 	e_TOKEN_TYPE_ARR,
@@ -91,6 +92,8 @@ enum E_TOKEN
 	E_TOKEN_RIGHT,
 	//_E_TOKEN_TEMP_STRING[32],
 }
+
+#define EMPTY_PARSER_TOKEN {e_TOKEN_TYPE_NONE, 0, Float:-1, bool:-1}
 
 enum E_OPERATOR_DATA
 {
@@ -248,7 +251,7 @@ static stock Parser_PeekToken(&consume)
 {
 	// Find out what the next token is, then backtrack to the start of it.
 	new
-		ret[E_TOKEN] = {e_TOKEN_TYPE_NONE, 0, Float:-1, bool:-1},
+		ret[E_TOKEN] = EMPTY_PARSER_TOKEN,
 		ptr = ISI_gInputPtr;
 	ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NONE,
 	Parser_SkipWhitespace();
@@ -789,7 +792,7 @@ static stock Parser_GetChar(ret[E_TOKEN])
 static stock Parser_GetLeft(prec)
 {
 	new
-		token[E_TOKEN] = {e_TOKEN_TYPE_NONE, 0, Float:-1, bool:-1},
+		token[E_TOKEN] = EMPTY_PARSER_TOKEN,
 		pos = ISI_gParsePos;
 	if (pos >= sizeof (ISI_gParseTree)) return Parser_Error("Parse Tree full.");
 	Parser_GetNextToken(token);
@@ -960,7 +963,7 @@ stock Parser_SetInput(line[], size = sizeof (line))
 stock Parser_GetToken(n)
 {
 	new
-		fail[E_TOKEN] = {e_TOKEN_TYPE_NONE, 0, -1, -1};
+		fail[E_TOKEN] = EMPTY_PARSER_TOKEN;
 	if (0 <= n < sizeof (ISI_gParseTree)) return ISI_gParseTree[n];
 	return fail;
 }
