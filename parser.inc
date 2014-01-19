@@ -67,20 +67,20 @@ enum e_TOKEN_OP
 
 enum e_TOKEN_TYPE
 {
-	e_TOKEN_TYPE_NONE,
-	e_TOKEN_TYPE_STRING,
+	e_TOKEN_TYPE_NONE   = 0,
+	e_TOKEN_TYPE_STRING = 1,
 	// These two are distinct for simplicity.
-	e_TOKEN_TYPE_NATIVE,
-	e_TOKEN_TYPE_FUNC,
+	e_TOKEN_TYPE_NATIVE = 2,
+	e_TOKEN_TYPE_FUNC   = 3,
+	e_TOKEN_TYPE_BOOL   = 4,
 	// This makes the code quite context-aware.
-	e_TOKEN_TYPE_FVAR, // Float variable.
-	e_TOKEN_TYPE_VAR,  // Regular variable.
-	e_TOKEN_TYPE_NUM,
-	e_TOKEN_TYPE_BOOL,
-	e_TOKEN_TYPE_FLOAT,
-	e_TOKEN_TYPE_OP,
-	e_TOKEN_TYPE_APP,
-	e_TOKEN_TYPE_ARR,
+	e_TOKEN_TYPE_FVAR   = 5, // Float variable.
+	e_TOKEN_TYPE_VAR    = 6,  // Regular variable.
+	e_TOKEN_TYPE_OP     = 7,
+	e_TOKEN_TYPE_NUM    = 8, // 8 >> 1 == 4
+	e_TOKEN_TYPE_FLOAT  = 9, // 9 >> 1 == 4
+	e_TOKEN_TYPE_APP    = 10,
+	e_TOKEN_TYPE_ARR    = 11
 }
 
 enum E_TOKEN

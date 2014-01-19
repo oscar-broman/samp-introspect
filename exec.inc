@@ -97,8 +97,12 @@ static stock bool:Exec_CheckTags(l[E_TOKEN], r[E_TOKEN])
 	return true;
 }
 
-static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr)
+static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr, e_TOKEN_TYPE:boolRet = e_TOKEN_TYPE:0)
 {
+	// When "boolRet" is "e_TOKEN_TYPE:1", return types are converted to just
+	// "e_TOKEN_TYPE_BOOL" from their original values.  This is done by shifting
+	// the values, and ensuring that any shifts from different start points end
+	// up with the same result (we discard information on purpose).
 	switch (l[E_TOKEN_TYPE])
 	{
 		case e_TOKEN_TYPE_VAR  : switch (r[E_TOKEN_TYPE])
@@ -114,7 +118,7 @@ static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr)
 			case e_TOKEN_TYPE_BOOL : return
 				lr = Exec_LoadAddress(l[E_TOKEN_SYM_PTR]),
 				rr = _:r[E_TOKEN_BOOL_VAL],
-				e_TOKEN_TYPE_NUM;
+				e_TOKEN_TYPE_NUM >>> boolRet;
 			case e_TOKEN_TYPE_FLOAT: return
 				lr = _:float(Exec_LoadAddress(l[E_TOKEN_SYM_PTR])),
 				rr = _:r[E_TOKEN_FLOAT_VAL],
@@ -137,7 +141,7 @@ static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr)
 			case e_TOKEN_TYPE_BOOL : return
 				lr = l[E_TOKEN_NUM_VAL],
 				rr = _:r[E_TOKEN_BOOL_VAL],
-				e_TOKEN_TYPE_NUM;
+				e_TOKEN_TYPE_NUM >>> boolRet;
 			case e_TOKEN_TYPE_FLOAT: return
 				lr = _:float(l[E_TOKEN_NUM_VAL]),
 				rr = _:r[E_TOKEN_FLOAT_VAL],
@@ -152,11 +156,11 @@ static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr)
 			case e_TOKEN_TYPE_VAR  : return
 				lr = _:l[E_TOKEN_BOOL_VAL],
 				rr = Exec_LoadAddress(r[E_TOKEN_SYM_PTR]),
-				e_TOKEN_TYPE_NUM;
+				e_TOKEN_TYPE_NUM >>> boolRet;
 			case e_TOKEN_TYPE_NUM  : return
 				lr = _:l[E_TOKEN_BOOL_VAL],
 				rr = r[E_TOKEN_NUM_VAL],
-				e_TOKEN_TYPE_NUM;
+				e_TOKEN_TYPE_NUM >>> boolRet;
 			case e_TOKEN_TYPE_BOOL : return
 				lr = _:l[E_TOKEN_BOOL_VAL],
 				rr = _:r[E_TOKEN_BOOL_VAL],
@@ -164,11 +168,11 @@ static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr)
 			case e_TOKEN_TYPE_FLOAT: return
 				lr = _:float(_:l[E_TOKEN_BOOL_VAL]),
 				rr = _:r[E_TOKEN_FLOAT_VAL],
-				e_TOKEN_TYPE_FLOAT;
+				e_TOKEN_TYPE_FLOAT >>> boolRet;
 			case e_TOKEN_TYPE_FVAR : return
 				lr = _:float(_:l[E_TOKEN_BOOL_VAL]),
 				rr = _:Float:Exec_LoadAddress(r[E_TOKEN_SYM_PTR]),
-				e_TOKEN_TYPE_FLOAT;
+				e_TOKEN_TYPE_FLOAT >>> boolRet;
 		}
 		case e_TOKEN_TYPE_FLOAT: switch (r[E_TOKEN_TYPE])
 		{
@@ -183,7 +187,7 @@ static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr)
 			case e_TOKEN_TYPE_BOOL : return
 				lr = _:l[E_TOKEN_FLOAT_VAL],
 				rr = _:float(_:r[E_TOKEN_BOOL_VAL]),
-				e_TOKEN_TYPE_FLOAT;
+				e_TOKEN_TYPE_FLOAT >>> boolRet;
 			case e_TOKEN_TYPE_FLOAT: return
 				lr = _:l[E_TOKEN_FLOAT_VAL],
 				rr = _:r[E_TOKEN_FLOAT_VAL],
@@ -206,7 +210,7 @@ static stock e_TOKEN_TYPE:Exec_ResolveTags(l[E_TOKEN], r[E_TOKEN], &lr, &rr)
 			case e_TOKEN_TYPE_BOOL : return
 				lr = _:Float:Exec_LoadAddress(l[E_TOKEN_SYM_PTR]),
 				rr = _:float(_:r[E_TOKEN_BOOL_VAL]),
-				e_TOKEN_TYPE_FLOAT;
+				e_TOKEN_TYPE_FLOAT >>> boolRet;
 			case e_TOKEN_TYPE_FLOAT: return
 				lr = _:Float:Exec_LoadAddress(l[E_TOKEN_SYM_PTR]),
 				rr = _:r[E_TOKEN_FLOAT_VAL],
