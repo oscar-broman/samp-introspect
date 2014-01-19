@@ -3,6 +3,10 @@
 #include <a_samp>
 // Tokeniser.  Read text and convert it to tokens for simple processing.
 
+#if !defined TODO
+	#define TODO { new Todo; }
+#endif
+
 enum e_TOKEN_OP
 {
 	e_TOKEN_OP_NONE,
@@ -68,8 +72,9 @@ enum e_TOKEN_TYPE
 	// These two are distinct for simplicity.
 	e_TOKEN_TYPE_NATIVE,
 	e_TOKEN_TYPE_FUNC,
-	e_TOKEN_TYPE_VAR,  // Normal variable.
+	// This makes the code quite context-aware.
 	e_TOKEN_TYPE_FVAR, // Float variable.
+	e_TOKEN_TYPE_VAR,  // Regular variable.
 	e_TOKEN_TYPE_NUM,
 	e_TOKEN_TYPE_BOOL,
 	e_TOKEN_TYPE_FLOAT,
@@ -93,7 +98,9 @@ enum E_TOKEN
 	//_E_TOKEN_TEMP_STRING[32],
 }
 
-#define EMPTY_PARSER_TOKEN {e_TOKEN_TYPE_NONE, 0, Float:-1, bool:-1}
+#define MAKE_PARSER_TOKEN(%0,%1,%2,%3) {%0, %1, Float:%2, bool:%3}
+#define MAKE_TOKEN(%0,%1) MAKE_PARSER_TOKEN(%0, %1, -1, -1)
+#define EMPTY_PARSER_TOKEN MAKE_TOKEN(e_TOKEN_TYPE_NONE, 0)
 
 enum E_OPERATOR_DATA
 {
@@ -161,7 +168,8 @@ static stock const
 			{".", 0}, // e_TOKEN_OP_POINT
 			// Here "colon" binds slightly tighter than "question mark" so that
 			// we don't need extra code to deal with ternary operators, instead
-			// we just give "?" a condition and a (true, false) pair.
+			// we just give "?" a condition and a (true, false) pair.  I might
+			// have to change this in the future if I do JIT execution.
 			{":", 7}, // e_TOKEN_OP_COLON
 			{"?", 6} // e_TOKEN_OP_QUESTION
 	};
@@ -671,9 +679,28 @@ static stock Parser_GetSymbol(ret[E_TOKEN])
 	while (Parser_IsSymbolCharacter(ISI_gInputLine[ptr])) ++ptr;
 	// Store the next character so we can blank it and get the symbol.
 	new
-		tmp = ISI_gInputLine[ptr];
+		tmp = ISI_gInputLine[ptr]; // So we can restore the value later.
 	ISI_gInputLine[ptr] = '\0';
+	// Booleans.
+	if (!strcmp(ISI_gInputLine[ISI_gInputPtr], "false"))
+	{
+		return
+			ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_BOOL,
+			ret[E_TOKEN_BOOL_VAL] = false,
+			ISI_gInputLine[(ISI_gInputPtr = ptr)] = tmp,
+			1;
+	}
+	else if (!strcmp(ISI_gInputLine[ISI_gInputPtr], "true"))
+	{
+		return
+			ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_BOOL,
+			ret[E_TOKEN_BOOL_VAL] = true,
+			ISI_gInputLine[(ISI_gInputPtr = ptr)] = tmp,
+			1;
+	}
+	// TODO: Keywords (if I want them - I'm only doing expressions ATM).
 	// TODO: Add constants:
+	TODO
 /*	#if defined INTROSPECT_CONSTANTS
 		if (Parser_GetConstant(ISI_gInputLine[ISI_gInputPtr], ret))
 		{
@@ -980,17 +1007,6 @@ stock Parser_GetToken(n)
 |******************************************************************************|
 \******************************************************************************/
 
-#if defined INTROSPECT_PARSER_TEST
-
-// "P"arser "T"est "N"umber.
-#define PTN(%1) ISI_gInputLine=#%1,ISI_gInputPtr=0,Parser_GetNextToken(ret),printf("%s: \"%s\"",(ret[E_TOKEN_TYPE]==e_TOKEN_TYPE_NUM&&ret[E_TOKEN_NUM_VAL]==%1)?("PASS"):("FAIL"),ISI_gInputLine)
-// "P"arser "T"est "F"loat.
-#define PTF(%1) ISI_gInputLine=#%1,ISI_gInputPtr=0,Parser_GetNextToken(ret),printf("%s: \"%s\"",(ret[E_TOKEN_TYPE]==e_TOKEN_TYPE_FLOAT&&ret[E_TOKEN_FLOAT_VAL]==%1)?("PASS"):("FAIL"),ISI_gInputLine)
-// "P"arser "T"est "O"ctal (no native PAWN representation).
-#define PTO(%0,%1) ISI_gInputLine=#%0,ISI_gInputPtr=0,Parser_GetNextToken(ret),printf("%s: \"%s\"",(ret[E_TOKEN_TYPE]==e_TOKEN_TYPE_NUM&&ret[E_TOKEN_NUM_VAL]==%1)?("PASS"):("FAIL"),ISI_gInputLine)
-
-#define TEST_OP(%1) ISI_gInputLine=#%1,ISI_gInputPtr=0,Parser_GetNextToken(ret),printf("%s: \"%s\"",(ret[E_TOKEN_TYPE]==e_TOKEN_TYPE_OP&&!strcmp(Parser_PrintOp(ret[E_TOKEN_OP]),#%1))?("PASS"):("FAIL"),ISI_gInputLine)
-
 stock Parser_PrintExpr(str[], size, tree[][E_TOKEN], entry)
 {
 	str[0] = '\0',
@@ -1062,6 +1078,17 @@ static stock _Parser_PrintTree(str[], size, tree[][E_TOKEN], entry, indent)
 	if (tree[entry][E_TOKEN_LEFT] != -1) _Parser_PrintTree(str, size, tree, tree[entry][E_TOKEN_LEFT], indent + 3);
 	if (tree[entry][E_TOKEN_RIGHT] != -1) _Parser_PrintTree(str, size, tree, tree[entry][E_TOKEN_RIGHT], indent + 3);
 }
+
+#if defined INTROSPECT_PARSER_TEST
+
+// "P"arser "T"est "N"umber.
+#define PTN(%1) ISI_gInputLine=#%1,ISI_gInputPtr=0,Parser_GetNextToken(ret),printf("%s: \"%s\"",(ret[E_TOKEN_TYPE]==e_TOKEN_TYPE_NUM&&ret[E_TOKEN_NUM_VAL]==%1)?("PASS"):("FAIL"),ISI_gInputLine)
+// "P"arser "T"est "F"loat.
+#define PTF(%1) ISI_gInputLine=#%1,ISI_gInputPtr=0,Parser_GetNextToken(ret),printf("%s: \"%s\"",(ret[E_TOKEN_TYPE]==e_TOKEN_TYPE_FLOAT&&ret[E_TOKEN_FLOAT_VAL]==%1)?("PASS"):("FAIL"),ISI_gInputLine)
+// "P"arser "T"est "O"ctal (no native PAWN representation).
+#define PTO(%0,%1) ISI_gInputLine=#%0,ISI_gInputPtr=0,Parser_GetNextToken(ret),printf("%s: \"%s\"",(ret[E_TOKEN_TYPE]==e_TOKEN_TYPE_NUM&&ret[E_TOKEN_NUM_VAL]==%1)?("PASS"):("FAIL"),ISI_gInputLine)
+
+#define TEST_OP(%1) ISI_gInputLine=#%1,ISI_gInputPtr=0,Parser_GetNextToken(ret),printf("%s: \"%s\"",(ret[E_TOKEN_TYPE]==e_TOKEN_TYPE_OP&&!strcmp(Parser_PrintOp(ret[E_TOKEN_OP]),#%1))?("PASS"):("FAIL"),ISI_gInputLine)
 
 main()
 {
