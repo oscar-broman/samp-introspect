@@ -239,7 +239,12 @@ static stock Parser_PeekChar()
 	return ISI_gInputLine[ISI_gInputPtr];
 }
 
-static stock Parser_PeekToken()
+static stock Parser_Pop(consume)
+{
+	return ISI_gInputPtr = consume;
+}
+
+static stock Parser_PeekToken(&consume)
 {
 	// Find out what the next token is, then backtrack to the start of it.
 	new
@@ -261,6 +266,7 @@ static stock Parser_PeekToken()
 		default: Parser_GetOp(ret);
 	}
 	return
+		consume = ISI_gInputPtr,
 		ISI_gInputPtr = ptr,
 		ret;
 }
@@ -855,22 +861,24 @@ static stock Parser_GetLeft(prec)
 		{
 			// Check for postfix operators.
 			new
+				consume,
 				t2[E_TOKEN];
 			ISI_gParseTree[ISI_gParsePos++] = token;
 			for ( ; ; )
 			{
-				t2 = Parser_PeekToken();
+				t2 = Parser_PeekToken(consume);
 				if (t2[E_TOKEN_TYPE] == e_TOKEN_TYPE_OP)
 				{
 					switch (t2[E_TOKEN_OP])
 					{
 						case e_TOKEN_OP_INC, e_TOKEN_OP_DEC:
 						{
-							t2[E_TOKEN_LEFT] = pos,
-							t2[E_TOKEN_RIGHT] = -1,
-							ISI_gParseTree[(pos = ISI_gParsePos++)] = t2,
-							Parser_GetNextToken(t2); // Consume
-							return pos;
+							return
+								t2[E_TOKEN_LEFT] = pos,
+								t2[E_TOKEN_RIGHT] = -1,
+								ISI_gParseTree[(pos = ISI_gParsePos++)] = t2,
+								Parser_Pop(consume),
+								pos;
 						}
 						case e_TOKEN_OP_OP_BRACKET:
 						{
@@ -878,7 +886,6 @@ static stock Parser_GetLeft(prec)
 							t2[E_TOKEN_LEFT] = pos,
 							t2[E_TOKEN_RIGHT] = Parser_GetLeft(prec),
 							ISI_gParseTree[(pos = ISI_gParsePos++)] = t2;
-							continue;
 						}
 						case e_TOKEN_OP_OP_SQUARE:
 						{
@@ -886,7 +893,6 @@ static stock Parser_GetLeft(prec)
 							t2[E_TOKEN_LEFT] = pos,
 							t2[E_TOKEN_RIGHT] = Parser_GetLeft(prec),
 							ISI_gParseTree[(pos = ISI_gParsePos++)] = t2;
-							continue;
 						}
 						default: return pos;
 					}
@@ -910,8 +916,9 @@ stock Parser_BuildTree(prec = cellmin)
 	for ( ; ; )
 	{
 		new
+			consume,
 			p2 = prec;
-		token = Parser_PeekToken();
+		token = Parser_PeekToken(consume);
 		//PrettyPrint(token);
 		switch (token[E_TOKEN_TYPE])
 		{
@@ -925,7 +932,8 @@ stock Parser_BuildTree(prec = cellmin)
 		}
 		new
 			ret = ISI_gParsePos++;
-		Parser_GetNextToken(token), // We only peeked, so pop.
+		//Parser_GetNextToken(token), // We only peeked, so pop.
+		Parser_Pop(consume),
 		token[E_TOKEN_LEFT] = left,
 		token[E_TOKEN_RIGHT] = Parser_BuildTree(p2),
 		ISI_gParseTree[ret] = token,

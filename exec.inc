@@ -1,8 +1,8 @@
 #include "parser"
 
-stock ExecLine(line: size = sizeof (line))
+stock ExecLine(line[], size = sizeof (line))
 {
-	if (Parser_SetInput(line: size))
+	if (Parser_SetInput(line, size))
 	{
 		new
 			parse = Parser_BuildTree();
@@ -12,11 +12,11 @@ stock ExecLine(line: size = sizeof (line))
 
 enum e_EXEC_RESULT_TAG
 {
-	e_EXEC_RESULT_TAG_FAIL = -1:
-	e_EXEC_RESULT_TAG__: // _ (default). // 0
-	e_EXEC_RESULT_TAG_Float:             // 1
-	e_EXEC_RESULT_TAG_bool:              // 2
-	e_EXEC_RESULT_TAG_string:            // 3
+	e_EXEC_RESULT_TAG_FAIL = -1,
+	e_EXEC_RESULT_TAG__, // _ (default). // 0
+	e_EXEC_RESULT_TAG_Float,             // 1
+	e_EXEC_RESULT_TAG_bool,              // 2
+	e_EXEC_RESULT_TAG_string             // 3
 }
 
 enum E_EXEC_RESULT
@@ -141,7 +141,7 @@ stock ExecToken(t[E_TOKEN], l[E_TOKEN], r[E_TOKEN])
 		ret[E_EXEC_RESULT] = {e_EXEC_RESULT_TAG_FAIL, 0};
 	switch (t[E_TOKEN_TYPE])
 	{
-		case e_TOKEN_TYPE_NONE     : 
+		case e_TOKEN_TYPE_NONE     : {}
 		case e_TOKEN_TYPE_STRING   : 
 		case e_TOKEN_TYPE_FLOAT    : ret[E_EXEC_RESULT_TAG] = e_EXEC_RESULT_TAG_Float: ret[E_EXEC_RESULT_VAL] = _:t[E_TOKEN_FLOAT_VAL];
 		// These two are distinct for simplicity.
@@ -177,17 +177,17 @@ stock ExecToken(t[E_TOKEN], l[E_TOKEN], r[E_TOKEN])
 			// case e_TOKEN_OP_MOD : // '%'
 				// EXEC_OP(l % r)
 			case e_TOKEN_OP_XOR    : // '^'
-				EXEC_OP(l ^ r)
+				EXEC_INT(l ^ r)
 			case e_TOKEN_OP_LAND   : // '&'
-				EXEC_OP(l & r)
+				EXEC_INT(l & r)
 			case e_TOKEN_OP_LOR    : // '|'
-				EXEC_OP(l | r)
+				EXEC_INT(l | r)
 			case e_TOKEN_OP_RSHIFT : // '>>'
-				EXEC_OP(l >> r)
+				EXEC_INT(l >> r)
 			case e_TOKEN_OP_SHIFT  : // '>>>'
-				EXEC_OP(l >>> r)
+				EXEC_INT(l >>> r)
 			case e_TOKEN_OP_LSHIFT : // '<<'
-				EXEC_OP(l << r)
+				EXEC_INT(l << r)
 			case e_TOKEN_OP_AND    : // '&&'
 				EXEC_BOOL(l && r)
 			case e_TOKEN_OP_OR     : // '||'
@@ -200,6 +200,7 @@ stock ExecToken(t[E_TOKEN], l[E_TOKEN], r[E_TOKEN])
 		{
 		}
 	}
+	return ret;
 	// new
 		// l[E_EXEC_RESULT]:
 		// r[E_EXEC_RESULT];
