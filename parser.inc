@@ -23,6 +23,7 @@ enum e_TOKEN_OP
 	e_TOKEN_OP_ADD, // '+'
 	e_TOKEN_OP_ADD_ASS, // '+='
 	e_TOKEN_OP_SUB, // '-'
+	e_TOKEN_OP_NEG, // '-'
 	e_TOKEN_OP_SUB_ASS, // '-='
 	e_TOKEN_OP_MUL, // '*'
 	e_TOKEN_OP_MUL_ASS, // '*='
@@ -33,6 +34,7 @@ enum e_TOKEN_OP
 	e_TOKEN_OP_XOR, // '^'
 	e_TOKEN_OP_XOR_ASS, // '^='
 	e_TOKEN_OP_LAND, // '&'
+	e_TOKEN_OP_REF, // '&'
 	e_TOKEN_OP_LAND_ASS, // '&='
 	e_TOKEN_OP_LOR, // '|'
 	e_TOKEN_OP_LOR_ASS, // '|='
@@ -50,8 +52,10 @@ enum e_TOKEN_OP
 	e_TOKEN_OP_CL_BRACE, // '}'
 	e_TOKEN_OP_OP_SQUARE, // '['
 	e_TOKEN_OP_CL_SQUARE, // ']'
-	e_TOKEN_OP_INC, // '++'
-	e_TOKEN_OP_DEC, // '--'
+	e_TOKEN_OP_PRE_INC, // '++'
+	e_TOKEN_OP_POST_INC, // '++'
+	e_TOKEN_OP_PRE_DEC, // '--'
+	e_TOKEN_OP_POST_DEC, // '--'
 	e_TOKEN_OP_ELIPSIS, // '...'
 	e_TOKEN_OP_CONCAT, // '..'
 	e_TOKEN_OP_HASH, // '#'
@@ -158,8 +162,8 @@ static stock const
 			{"}", 0}, // e_TOKEN_OP_CL_BRACE
 			{"[", 0}, // e_TOKEN_OP_OP_SQUARE
 			{"]", 0}, // e_TOKEN_OP_CL_SQUARE
-			{"++", -1}, // e_TOKEN_OP_INC
-			{"--", -1}, // e_TOKEN_OP_DEC
+			{"++", -1}, // e_TOKEN_OP_PRE_INC
+			{"--", -1}, // e_TOKEN_OP_PRE_DEC
 			{"...", 8}, // e_TOKEN_OP_ELIPSIS
 			{"..", 26}, // e_TOKEN_OP_CONCAT
 			{"#", -1}, // e_TOKEN_OP_HASH
@@ -346,8 +350,8 @@ static stock Parser_GetOp(ret[E_TOKEN])
 	PARSER_DO_OP_2(e_TOKEN_OP_AND, '&', '&')
 	PARSER_DO_OP_2(e_TOKEN_OP_OR, '|', '|')
 	PARSER_DO_OP_2(e_TOKEN_OP_PAAMAYIM, ':', ':')
-	PARSER_DO_OP_2(e_TOKEN_OP_INC, '+', '+')
-	PARSER_DO_OP_2(e_TOKEN_OP_DEC, '-', '-')
+	PARSER_DO_OP_2(e_TOKEN_OP_PRE_INC, '+', '+')
+	PARSER_DO_OP_2(e_TOKEN_OP_PRE_DEC, '-', '-')
 	PARSER_DO_OP_2(e_TOKEN_OP_CONCAT, '.', '.')
 	PARSER_DO_OP_1(e_TOKEN_OP_ASSIGN, '=')
 	PARSER_DO_OP_1(e_TOKEN_OP_LESS, '<')
@@ -833,8 +837,7 @@ static stock Parser_GetLeft(prec)
 		{
 			switch (token[E_TOKEN_OP])
 			{
-				case
-					e_TOKEN_OP_OP_BRACKET:
+				case e_TOKEN_OP_OP_BRACKET:
 				{
 					// Start of a new bracketed set.
 					pos = Parser_BuildTree(0);
@@ -847,8 +850,7 @@ static stock Parser_GetLeft(prec)
 						return Parser_Error("Expected token \")\", but found: %s", pp);
 					}
 				}
-				case
-					e_TOKEN_OP_OP_BRACE:
+				case e_TOKEN_OP_OP_BRACE:
 				{
 					// Start of a new bracketed set.
 					pos = Parser_BuildTree(0);
@@ -861,8 +863,7 @@ static stock Parser_GetLeft(prec)
 						return Parser_Error("Expected token \")\", but found: %s", pp);
 					}
 				}
-				case
-					e_TOKEN_OP_OP_SQUARE:
+				case e_TOKEN_OP_OP_SQUARE:
 				{
 					// Start of a new bracketed set.
 					pos = Parser_BuildTree(0);
@@ -875,14 +876,26 @@ static stock Parser_GetLeft(prec)
 						return Parser_Error("Expected token \")\", but found: %s", pp);
 					}
 				}
-				case
-					e_TOKEN_OP_NOT,
-					e_TOKEN_OP_INV,
-					e_TOKEN_OP_ADD,
-					e_TOKEN_OP_SUB,
-					e_TOKEN_OP_INC,
-					e_TOKEN_OP_DEC,
-					e_TOKEN_OP_HASH:
+				case e_TOKEN_OP_SUB: // Prefix, not infix, "-".
+				{
+					++ISI_gParsePos,
+					token[E_TOKEN_OP] = e_TOKEN_OP_NEG,
+					token[E_TOKEN_RIGHT] = Parser_GetLeft(prec),
+					ISI_gParseTree[pos] = token;
+				}
+				case e_TOKEN_OP_LAND: // Prefix, not infix, "&".
+				{
+					++ISI_gParsePos,
+					token[E_TOKEN_OP] = e_TOKEN_OP_REF,
+					token[E_TOKEN_RIGHT] = Parser_GetLeft(prec),
+					ISI_gParseTree[pos] = token;
+				}
+				case e_TOKEN_OP_NOT,
+				     e_TOKEN_OP_INV,
+				     e_TOKEN_OP_ADD,
+				     e_TOKEN_OP_PRE_INC,
+				     e_TOKEN_OP_PRE_DEC,
+				     e_TOKEN_OP_HASH:
 				{
 					++ISI_gParsePos,
 					token[E_TOKEN_RIGHT] = Parser_GetLeft(prec),
@@ -906,9 +919,20 @@ static stock Parser_GetLeft(prec)
 				{
 					switch (t2[E_TOKEN_OP])
 					{
-						case e_TOKEN_OP_INC, e_TOKEN_OP_DEC:
+						case e_TOKEN_OP_PRE_INC:
 						{
 							return
+								t2[E_TOKEN_OP] = e_TOKEN_OP_POST_INC,
+								t2[E_TOKEN_LEFT] = pos,
+								t2[E_TOKEN_RIGHT] = -1,
+								ISI_gParseTree[(pos = ISI_gParsePos++)] = t2,
+								Parser_Pop(consume),
+								pos;
+						}
+						case e_TOKEN_OP_PRE_DEC:
+						{
+							return
+								t2[E_TOKEN_OP] = e_TOKEN_OP_POST_DEC,
 								t2[E_TOKEN_LEFT] = pos,
 								t2[E_TOKEN_RIGHT] = -1,
 								ISI_gParseTree[(pos = ISI_gParsePos++)] = t2,
