@@ -80,6 +80,7 @@ enum e_TOKEN_TYPE
 	e_TOKEN_TYPE_NUM,
 	e_TOKEN_TYPE_APP,
 	e_TOKEN_TYPE_ARR,
+	e_TOKEN_TYPE_MD,   // This can tell when we have a multi-dimensional array.
 	e_TOKEN_TYPE_OP
 }
 
@@ -234,6 +235,7 @@ static stock Parser_Print(token[E_TOKEN], ret[], len = sizeof (ret))
 		case e_TOKEN_TYPE_OP:     format(ret, len, "OPERATOR: %s", Parser_PrintOp(token[E_TOKEN_OP]));
 		case e_TOKEN_TYPE_APP: ret[0] = '\0', strcat(ret, "APPLY", len);
 		case e_TOKEN_TYPE_ARR: ret[0] = '\0', strcat(ret, "INDEX", len);
+		case e_TOKEN_TYPE_MD:  ret[0] = '\0', strcat(ret, "INDEX", len);
 		default: ret[0] = '\0', strcat(ret, "<unknown>", len);
 	}
 }
@@ -245,7 +247,8 @@ static stock PrettyPrint(token[E_TOKEN])
 	print(str);
 }
 
-#define Parser_Error(%0) printf("PARSER ERROR: " %0)
+#define Parser_Error(%0) printf("PARSER ERROR  : " %0)
+#define Parser_Warning(%0) printf("PARSER WARNING: " %0)
 
 static stock Parser_PeekChar()
 {
@@ -892,6 +895,7 @@ static stock Parser_GetLeft(prec)
 		{
 			// Check for postfix operators.
 			new
+				bool:once = false,
 				consume,
 				t2[E_TOKEN];
 			ISI_gParseTree[ISI_gParsePos++] = token;
@@ -913,6 +917,8 @@ static stock Parser_GetLeft(prec)
 						}
 						case e_TOKEN_OP_OP_BRACKET:
 						{
+							if (once) return Parser_Error("Invalid syntax.");
+							once = true,
 							t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_APP,
 							t2[E_TOKEN_LEFT] = pos,
 							t2[E_TOKEN_RIGHT] = Parser_GetLeft(prec),
@@ -920,7 +926,8 @@ static stock Parser_GetLeft(prec)
 						}
 						case e_TOKEN_OP_OP_SQUARE:
 						{
-							t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR,
+							if (once) t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_MD;
+							else t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR, once = true;
 							t2[E_TOKEN_LEFT] = pos,
 							t2[E_TOKEN_RIGHT] = Parser_GetLeft(prec),
 							ISI_gParseTree[(pos = ISI_gParsePos++)] = t2;
@@ -1029,6 +1036,7 @@ static stock _Parser_PrintToken(str[], size, token[E_TOKEN], bool:bracket)
 			else format(str, size, "%s%s", str, Parser_PrintOp(token[E_TOKEN_OP]));
 		case e_TOKEN_TYPE_APP:    strcat(str, "()", size);
 		case e_TOKEN_TYPE_ARR:    strcat(str, "[]", size);
+		case e_TOKEN_TYPE_MD:     strcat(str, "->", size);
 	}
 }
 
@@ -1038,7 +1046,7 @@ static stock _Parser_PrintExpr(str[], size, tree[][E_TOKEN], entry)
 		bool:bracket = false;
 	switch (tree[entry][E_TOKEN_TYPE])
 	{
-		case e_TOKEN_TYPE_ARR:
+		case e_TOKEN_TYPE_ARR, e_TOKEN_TYPE_MD:
 		{
 			_Parser_PrintExpr(str, size, tree, tree[entry][E_TOKEN_LEFT]);
 			strcat(str, "[", size);
