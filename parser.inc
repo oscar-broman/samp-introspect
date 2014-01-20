@@ -10,63 +10,63 @@
 enum e_TOKEN_OP
 {
 	e_TOKEN_OP_NONE,
-	e_TOKEN_OP_ASSIGN, // '='
-	e_TOKEN_OP_EQUALS, // '=='
-	e_TOKEN_OP_LTE, // '<='
-	e_TOKEN_OP_GTE, // '>='
-	e_TOKEN_OP_LESS, // '<'
-	e_TOKEN_OP_GREATER, // '>'
-	e_TOKEN_OP_NOT, // '!'
-	e_TOKEN_OP_NEQ, // '!='
-	e_TOKEN_OP_INV, // '~'
-	e_TOKEN_OP_INV_ASS, // '~='
-	e_TOKEN_OP_ADD, // '+'
-	e_TOKEN_OP_ADD_ASS, // '+='
-	e_TOKEN_OP_SUB, // '-'
-	e_TOKEN_OP_NEG, // '-'
-	e_TOKEN_OP_SUB_ASS, // '-='
-	e_TOKEN_OP_MUL, // '*'
-	e_TOKEN_OP_MUL_ASS, // '*='
-	e_TOKEN_OP_DIV, // '/'
-	e_TOKEN_OP_DIV_ASS, // '/='
-	e_TOKEN_OP_MOD, // '%'
-	e_TOKEN_OP_MOD_ASS, // '%='
-	e_TOKEN_OP_XOR, // '^'
-	e_TOKEN_OP_XOR_ASS, // '^='
-	e_TOKEN_OP_LAND, // '&'
-	e_TOKEN_OP_REF, // '&'
-	e_TOKEN_OP_LAND_ASS, // '&='
-	e_TOKEN_OP_LOR, // '|'
-	e_TOKEN_OP_LOR_ASS, // '|='
-	e_TOKEN_OP_RSHIFT, // '>>'
-	e_TOKEN_OP_RSHIFT_ASS, // '>>='
-	e_TOKEN_OP_SHIFT, // '>>>'
-	e_TOKEN_OP_SHIFT_ASS, // '>>>='
-	e_TOKEN_OP_LSHIFT, // '<<'
-	e_TOKEN_OP_LSHIFT_ASS, // '<<='
-	e_TOKEN_OP_AND, // '&&'
-	e_TOKEN_OP_OR, // '||'
-	e_TOKEN_OP_OP_BRACKET, // '('
-	e_TOKEN_OP_CL_BRACKET, // ')'
-	e_TOKEN_OP_OP_BRACE, // '{'
-	e_TOKEN_OP_CL_BRACE, // '}'
-	e_TOKEN_OP_OP_SQUARE, // '['
-	e_TOKEN_OP_CL_SQUARE, // ']'
-	e_TOKEN_OP_PRE_INC, // '++'
-	e_TOKEN_OP_POST_INC, // '++'
-	e_TOKEN_OP_PRE_DEC, // '--'
-	e_TOKEN_OP_POST_DEC, // '--'
-	e_TOKEN_OP_ELIPSIS, // '...'
-	e_TOKEN_OP_CONCAT, // '..'
-	e_TOKEN_OP_HASH, // '#'
-	e_TOKEN_OP_PAAMAYIM, // '::'
-	e_TOKEN_OP_DQUOTE, // '"'
-	e_TOKEN_OP_QUOTE, // '''
-	e_TOKEN_OP_SEMICOLON, // ';'
-	e_TOKEN_OP_COMMA, // ','
-	e_TOKEN_OP_POINT, // '.'
-	e_TOKEN_OP_COLON, // ':'
-	e_TOKEN_OP_QUESTION, // '?'
+	e_TOKEN_OP_ASSIGN,     // =
+	e_TOKEN_OP_EQUALS,     // ==
+	e_TOKEN_OP_LTE,        // <=
+	e_TOKEN_OP_GTE,        // >=
+	e_TOKEN_OP_LESS,       // <
+	e_TOKEN_OP_GREATER,    // >
+	e_TOKEN_OP_NOT,        // !
+	e_TOKEN_OP_NEQ,        // !=
+	e_TOKEN_OP_INV,        // ~
+	e_TOKEN_OP_INV_ASS,    // ~=
+	e_TOKEN_OP_ADD,        // +
+	e_TOKEN_OP_ADD_ASS,    // +=
+	e_TOKEN_OP_SUB,        // -   (INFIX)
+	e_TOKEN_OP_NEG,        // -   (PREFIX)
+	e_TOKEN_OP_SUB_ASS,    // -=
+	e_TOKEN_OP_MUL,        // *
+	e_TOKEN_OP_MUL_ASS,    // *=
+	e_TOKEN_OP_DIV,        // /
+	e_TOKEN_OP_DIV_ASS,    // /=
+	e_TOKEN_OP_MOD,        // %
+	e_TOKEN_OP_MOD_ASS,    // %=
+	e_TOKEN_OP_XOR,        // ^
+	e_TOKEN_OP_XOR_ASS,    // ^=
+	e_TOKEN_OP_LAND,       // &   (INFIX)
+	e_TOKEN_OP_REF,        // &   (PREFIX)
+	e_TOKEN_OP_LAND_ASS,   // &=
+	e_TOKEN_OP_LOR,        // |
+	e_TOKEN_OP_LOR_ASS,    // |=
+	e_TOKEN_OP_RSHIFT,     // >>
+	e_TOKEN_OP_RSHIFT_ASS, // >>=
+	e_TOKEN_OP_SHIFT,      // >>>
+	e_TOKEN_OP_SHIFT_ASS,  // >>>=
+	e_TOKEN_OP_LSHIFT,     // <<
+	e_TOKEN_OP_LSHIFT_ASS, // <<=
+	e_TOKEN_OP_AND,        // &&
+	e_TOKEN_OP_OR,         // ||
+	e_TOKEN_OP_OP_BRACKET, // (
+	e_TOKEN_OP_CL_BRACKET, // )
+	e_TOKEN_OP_OP_BRACE,   // {
+	e_TOKEN_OP_CL_BRACE,   // }
+	e_TOKEN_OP_OP_SQUARE,  // [
+	e_TOKEN_OP_CL_SQUARE,  // ]
+	e_TOKEN_OP_PRE_INC,    // ++  (PREFIX)
+	e_TOKEN_OP_POST_INC,   // ++  (SUFFIX)
+	e_TOKEN_OP_PRE_DEC,    // --  (PREFIX)
+	e_TOKEN_OP_POST_DEC,   // --  (SUFFIX)
+	e_TOKEN_OP_ELIPSIS,    // ...
+	e_TOKEN_OP_CONCAT,     // ..
+	e_TOKEN_OP_HASH,       // #
+	e_TOKEN_OP_PAAMAYIM,   // ::
+	e_TOKEN_OP_DQUOTE,     // "
+	e_TOKEN_OP_QUOTE,      // '
+	e_TOKEN_OP_SEMICOLON,  // ;
+	e_TOKEN_OP_COMMA,      // ,
+	e_TOKEN_OP_POINT,      // .
+	e_TOKEN_OP_COLON,      // :
+	e_TOKEN_OP_QUESTION,   // ?
 }
 
 enum e_TOKEN_TYPE
@@ -84,9 +84,24 @@ enum e_TOKEN_TYPE
 	e_TOKEN_TYPE_NUM,
 	e_TOKEN_TYPE_APP,
 	e_TOKEN_TYPE_ARR,
-	e_TOKEN_TYPE_MD,   // This can tell when we have a multi-dimensional array.
-	e_TOKEN_TYPE_OP
+	//e_TOKEN_TYPE_MD,   // This is used when we have a multi-dimensional array.
+	e_TOKEN_TYPE_OP,
+	// Special types for unresolved arrays.
+	e_TOKEN_TYPE_ARR@0,
+	e_TOKEN_TYPE_ARR@1,
+	e_TOKEN_TYPE_ARR@2,
+	e_TOKEN_TYPE_ARR@3,
+	e_TOKEN_TYPE_ARR@4,
+	e_TOKEN_TYPE_ARR@5,
+	e_TOKEN_TYPE_FARR@0,
+	e_TOKEN_TYPE_FARR@1,
+	e_TOKEN_TYPE_FARR@2,
+	e_TOKEN_TYPE_FARR@3,
+	e_TOKEN_TYPE_FARR@4,
+	e_TOKEN_TYPE_FARR@5,
 }
+
+#define TOKEN_ARRAY_CASES e_TOKEN_TYPE_ARR@0,e_TOKEN_TYPE_ARR@1,e_TOKEN_TYPE_ARR@2,e_TOKEN_TYPE_ARR@3,e_TOKEN_TYPE_ARR@4,e_TOKEN_TYPE_ARR@5,e_TOKEN_TYPE_FARR@0,e_TOKEN_TYPE_FARR@1,e_TOKEN_TYPE_FARR@2,e_TOKEN_TYPE_FARR@3,e_TOKEN_TYPE_FARR@4,e_TOKEN_TYPE_FARR@5
 
 enum E_TOKEN
 {
@@ -135,6 +150,7 @@ static stock const
 			// This is the precedence for the binary operator, the unary
 			// operators all have the same precedence and are handled specially.
 			{"-", 22}, // e_TOKEN_OP_SUB
+			{"-", 22}, // e_TOKEN_OP_NEG
 			{"-=", 4}, // e_TOKEN_OP_SUB_ASS
 			{"*", 24}, // e_TOKEN_OP_MUL
 			{"*=", 4}, // e_TOKEN_OP_MUL_ASS
@@ -145,6 +161,7 @@ static stock const
 			{"^", 17}, // e_TOKEN_OP_XOR
 			{"^=", 4}, // e_TOKEN_OP_XOR_ASS
 			{"&", 18}, // e_TOKEN_OP_LAND
+			{"&", 18}, // e_TOKEN_OP_REF
 			{"&=", 4}, // e_TOKEN_OP_LAND_ASS
 			{"|", 16}, // e_TOKEN_OP_LOR
 			{"|=", 4}, // e_TOKEN_OP_LOR_ASS
@@ -163,7 +180,9 @@ static stock const
 			{"[", 0}, // e_TOKEN_OP_OP_SQUARE
 			{"]", 0}, // e_TOKEN_OP_CL_SQUARE
 			{"++", -1}, // e_TOKEN_OP_PRE_INC
+			{"++", -1}, // e_TOKEN_OP_POST_INC
 			{"--", -1}, // e_TOKEN_OP_PRE_DEC
+			{"--", -1}, // e_TOKEN_OP_POST_DEC
 			{"...", 8}, // e_TOKEN_OP_ELIPSIS
 			{"..", 26}, // e_TOKEN_OP_CONCAT
 			{"#", -1}, // e_TOKEN_OP_HASH
@@ -182,6 +201,7 @@ static stock const
 	};
 
 static stock
+	ISI_gFloatTagIndex = -1,
 	ISI_gInputLine[512],
 	ISI_gInputLen,
 	ISI_gInputPtr,
@@ -239,7 +259,7 @@ static stock Parser_Print(token[E_TOKEN], ret[], len = sizeof (ret))
 		case e_TOKEN_TYPE_OP:     format(ret, len, "OPERATOR: %s", Parser_PrintOp(token[E_TOKEN_OP]));
 		case e_TOKEN_TYPE_APP: ret[0] = '\0', strcat(ret, "APPLY", len);
 		case e_TOKEN_TYPE_ARR: ret[0] = '\0', strcat(ret, "INDEX", len);
-		case e_TOKEN_TYPE_MD:  ret[0] = '\0', strcat(ret, "INDEX", len);
+		//case e_TOKEN_TYPE_MD:  ret[0] = '\0', strcat(ret, "INDEX", len);
 		default: ret[0] = '\0', strcat(ret, "<unknown>", len);
 	}
 }
@@ -407,7 +427,52 @@ static stock Parser_GetNextToken(ret[E_TOKEN])
 	{
 		case '\0': return 0;
 		case '0' .. '9': Parser_GetNumber(ret);
-		case 'a' .. 'z', 'A' .. 'Z', '_', '@': Parser_GetSymbol(ret);
+		case 'a' .. 'z', 'A' .. 'Z', '_', '@':
+		{
+			Parser_GetSymbol(ret);
+			// Resolve the symbol
+			switch (ret[E_TOKEN_TYPE])
+			{
+				case e_TOKEN_TYPE_VAR:
+				{
+					// Will currently have "E_TOKEN_STRING_IDX" set.
+					new
+						idx = ret[E_TOKEN_STRING_IDX],
+						info[E_VARIABLE];
+					/*
+						Address,
+						Tag,
+						CodeStart,
+						CodeEnd,
+						Ident,
+						Name[32],
+						Dimensions,
+						DimensionSize[3],
+						DimensionTag[3]
+					*/
+					GetVariableInfo(ISI_gsStringTable[idx], info);
+					// Preserve the tag.
+					if (ISI_gFloatTagIndex == -1) ISI_gFloatTagIndex = GetTagIdx("Float");
+					// Preserve the dimension information.
+					if (info[Tag] == ISI_gFloatTagIndex) switch (info[Dimensions])
+					{
+						case 0: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FVAR;
+						case 1: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@1;
+						case 2: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@2;
+						case 3: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@3;
+					}
+					else switch (info[Dimensions])
+					{
+						case 1: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@1;
+						case 2: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@2;
+						case 3: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@3;
+					}
+					// Convert to a pointer.
+					ret[E_TOKEN_SYM_PTR] = info[Address];
+					// Remove this string from the table.
+					ISI_gsStringEnd = idx;
+			}
+		}
 		case '"': Parser_GetString(ret);
 		case '\'': Parser_GetChar(ret);
 		default: Parser_GetOp(ret);
@@ -950,8 +1015,7 @@ static stock Parser_GetLeft(prec)
 						}
 						case e_TOKEN_OP_OP_SQUARE:
 						{
-							if (once) t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_MD;
-							else t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR, once = true;
+							t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR,
 							t2[E_TOKEN_LEFT] = pos,
 							t2[E_TOKEN_RIGHT] = Parser_GetLeft(prec),
 							ISI_gParseTree[(pos = ISI_gParsePos++)] = t2;
@@ -1060,7 +1124,7 @@ static stock _Parser_PrintToken(str[], size, token[E_TOKEN], bool:bracket)
 			else format(str, size, "%s%s", str, Parser_PrintOp(token[E_TOKEN_OP]));
 		case e_TOKEN_TYPE_APP:    strcat(str, "()", size);
 		case e_TOKEN_TYPE_ARR:    strcat(str, "[]", size);
-		case e_TOKEN_TYPE_MD:     strcat(str, "->", size);
+		// case e_TOKEN_TYPE_MD:     strcat(str, "->", size);
 	}
 }
 
@@ -1070,7 +1134,7 @@ static stock _Parser_PrintExpr(str[], size, tree[][E_TOKEN], entry)
 		bool:bracket = false;
 	switch (tree[entry][E_TOKEN_TYPE])
 	{
-		case e_TOKEN_TYPE_ARR, e_TOKEN_TYPE_MD:
+		case e_TOKEN_TYPE_ARR:
 		{
 			_Parser_PrintExpr(str, size, tree, tree[entry][E_TOKEN_LEFT]);
 			strcat(str, "[", size);
