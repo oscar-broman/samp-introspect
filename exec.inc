@@ -336,8 +336,7 @@ static stock e_TOKEN_TYPE:Exec_ResolveInt(const l[E_TOKEN], const r[E_TOKEN], &l
 					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FLOAT,
 					ret[E_TOKEN_FLOAT_VAL] = Float:rr;
 				}
-				default:
-					EXEC_NOT_LVALUE;
+				default: EXEC_NOT_LVALUE;
 			}
 			#define _EXEC_DO_ASSIGN(%0) case e_TOKEN_OP_%0_ASS: { \
 				static const scMathOp[E_TOKEN] = MAKE_PARSER_TOKEN(e_TOKEN_TYPE_OP, e_TOKEN_OP_%0, -1, -1); \
@@ -386,8 +385,7 @@ static stock e_TOKEN_TYPE:Exec_ResolveInt(const l[E_TOKEN], const r[E_TOKEN], &l
 				case e_TOKEN_TYPE_FVAR :
 					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FLOAT,
 					ret[E_TOKEN_FLOAT_VAL] = ~Float:Exec_LoadAddress(r[E_TOKEN_SYM_PTR]);
-				default:
-					Parser_Error("Unary inversion not applied to value.");
+				default: Parser_Error("Unary inversion not applied to value.");
 			}
 			case e_TOKEN_OP_NOT : switch (r[E_TOKEN_TYPE])
 			{
@@ -406,8 +404,7 @@ static stock e_TOKEN_TYPE:Exec_ResolveInt(const l[E_TOKEN], const r[E_TOKEN], &l
 				case e_TOKEN_TYPE_FVAR :
 					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_BOOL,
 					ret[E_TOKEN_BOOL_VAL] = !Float:Exec_LoadAddress(r[E_TOKEN_SYM_PTR]);
-				default:
-					Parser_Error("Unary negation not applied to value.");
+				default: Parser_Error("Unary negation not applied to value.");
 			}
 			case e_TOKEN_OP_SUB : // '-'
 				// TODO: Check for unary minus. // Done.
@@ -435,9 +432,7 @@ static stock e_TOKEN_TYPE:Exec_ResolveInt(const l[E_TOKEN], const r[E_TOKEN], &l
 					}
 				}
 				else
-				{
 					EXEC_OP(l - r, floatsub)
-				}
 			case e_TOKEN_OP_ADD    : // '+'
 				EXEC_OP(l + r, floatadd)
 			case e_TOKEN_OP_MUL    : // '*'
@@ -449,8 +444,7 @@ static stock e_TOKEN_TYPE:Exec_ResolveInt(const l[E_TOKEN], const r[E_TOKEN], &l
 				if (Exec_ResolveTags(l, r, lr, rr) == e_TOKEN_TYPE_NUM)
 					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NUM,
 					ret[E_TOKEN_NUM_VAL] = lr % rr;
-				else
-					EXEC_INCOMPATIBLE;
+				else EXEC_INCOMPATIBLE;
 			}
 			case e_TOKEN_OP_XOR    : // '^'
 				EXEC_INT(l ^ r)
@@ -492,11 +486,9 @@ static stock e_TOKEN_TYPE:Exec_ResolveInt(const l[E_TOKEN], const r[E_TOKEN], &l
 						Exec_WriteAddress(r[E_TOKEN_SYM_PTR], rr),
 						ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FLOAT,
 						ret[E_TOKEN_FLOAT_VAL] = Float:rr;
-					default:
-						EXEC_NOT_LVALUE;
+					default: EXEC_NOT_LVALUE;
 				}
-				default:
-					EXEC_NOT_LVALUE;
+				default: EXEC_NOT_LVALUE;
 			}
 			case e_TOKEN_OP_DEC: switch (l[E_TOKEN_TYPE])
 			{
@@ -522,30 +514,67 @@ static stock e_TOKEN_TYPE:Exec_ResolveInt(const l[E_TOKEN], const r[E_TOKEN], &l
 						Exec_WriteAddress(r[E_TOKEN_SYM_PTR], rr),
 						ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FLOAT,
 						ret[E_TOKEN_FLOAT_VAL] = Float:rr;
-					default:
-						EXEC_NOT_LVALUE;
+					default: EXEC_NOT_LVALUE;
 				}
-				default:
-					EXEC_NOT_LVALUE;
+				default: EXEC_NOT_LVALUE;
 			}
 		}
 		case e_TOKEN_TYPE_APP      :
 		{
 		}
-		case e_TOKEN_TYPE_ARR      : switch (l[E_TOKEN_TYPE])
+		case e_TOKEN_TYPE_ARR      :
 		{
-			case e_TOKEN_TYPE_VAR:
+			switch (r[E_TOKEN_TYPE])
 			{
-				lr = Exec_LoadAddress(l[E_TOKEN_SYM_PTR]),
-				Exec_WriteAddress(l[E_TOKEN_SYM_PTR], lr - 1),
-				ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NUM,
-				ret[E_TOKEN_NUM_VAL] = lr;
+				case e_TOKEN_TYPE_VAR  :
+					rr = Exec_LoadAddress(r[E_TOKEN_SYM_PTR]);
+				case e_TOKEN_TYPE_NUM  :
+					rr = r[E_TOKEN_NUM_VAL];
+				case e_TOKEN_TYPE_BOOL :
+					EXEC_TAG_MISMATCH,
+					rr = _:r[E_TOKEN_BOOL_VAL];
+				case e_TOKEN_TYPE_FLOAT:
+					EXEC_TAG_MISMATCH,
+					rr = floatround(r[E_TOKEN_FLOAT_VAL]);
+				case e_TOKEN_TYPE_FVAR :
+					EXEC_TAG_MISMATCH,
+					rr = floatround(Float:Exec_LoadAddress(r[E_TOKEN_SYM_PTR]));
+				default: return Parser_Error("Invalid index."), ret;
 			}
-			case e_TOKEN_TYPE_FVAR:
+			switch (l[E_TOKEN_TYPE])
 			{
+				case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_FVAR:
+					ret[E_TOKEN_TYPE] = l[E_TOKEN_TYPE],
+					ret[E_TOKEN_SYM_PTR] = l[E_TOKEN_SYM_PTR] + (rr * 4);
+				default: EXEC_NOT_LVALUE;
 			}
-			default:
-				EXEC_NOT_LVALUE;
+		}
+		case e_TOKEN_TYPE_MD      :
+		{
+			switch (r[E_TOKEN_TYPE])
+			{
+				case e_TOKEN_TYPE_VAR  :
+					rr = Exec_LoadAddress(r[E_TOKEN_SYM_PTR]);
+				case e_TOKEN_TYPE_NUM  :
+					rr = r[E_TOKEN_NUM_VAL];
+				case e_TOKEN_TYPE_BOOL :
+					EXEC_TAG_MISMATCH,
+					rr = _:r[E_TOKEN_BOOL_VAL];
+				case e_TOKEN_TYPE_FLOAT:
+					EXEC_TAG_MISMATCH,
+					rr = floatround(r[E_TOKEN_FLOAT_VAL]);
+				case e_TOKEN_TYPE_FVAR :
+					EXEC_TAG_MISMATCH,
+					rr = floatround(Float:Exec_LoadAddress(r[E_TOKEN_SYM_PTR]));
+				default: return Parser_Error("Invalid index."), ret;
+			}
+			switch (l[E_TOKEN_TYPE])
+			{
+				case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_FVAR:
+					ret[E_TOKEN_TYPE] = l[E_TOKEN_TYPE],
+					ret[E_TOKEN_SYM_PTR] = Exec_LoadAddress(l[E_TOKEN_SYM_PTR]) + (rr * 4);
+				default: EXEC_NOT_LVALUE;
+			}
 		}
 	}
 	return ret;

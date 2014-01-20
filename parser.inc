@@ -1181,7 +1181,7 @@ main()
 	TEST_OP("::");
 	
 	//ISI_gInputLine = "34 0x55 7.7 \"Hello \\\"there\\\"\" 'a' MyFuncSymbol",
-	ISI_gInputLine = "-someVar + 5 * ((44) + 5) / func(a, b, c) * arr[5][6][7] - someVar++ - ++someVar - someVar-- - --someVar",
+	ISI_gInputLine = "-someVar + 5 * ((44) + 5) / func(a, b, c) * arr[5][6][xx[5]] - someVar++ - ++someVar - someVar-- - --someVar",
 	ISI_gInputPtr = 0;
 	new
 		pos = Parser_BuildTree(cellmin),
