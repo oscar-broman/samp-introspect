@@ -14,6 +14,15 @@
 #tryinclude <amx_assembly\amx_header>
 #tryinclude <amx\amx_header>
 
+#if !defined ref
+	#error amx_assembly is required. Get it here: github.com/Zeex/amx_assembly
+#endif
+
+#tryinclude "amx_assembly\amx_header"
+#tryinclude "amx\amx_header"
+#tryinclude <amx_assembly\amx_header>
+#tryinclude <amx\amx_header>
+
 #tryinclude "amx_assembly\dynamic_call"
 #tryinclude "amx\dynamic_call"
 #tryinclude <amx_assembly\dynamic_call>
@@ -95,7 +104,6 @@ enum e_TOKEN_TYPE
 	e_TOKEN_TYPE_FUNC,
 	e_TOKEN_TYPE_FFUNC,
 	// This makes the code quite context-aware.
-	e_TOKEN_TYPE_LOCAL, // Special variable.
 	e_TOKEN_TYPE_VAR,   // Regular variable.
 	e_TOKEN_TYPE_FVAR,  // Float variable.
 	e_TOKEN_TYPE_FLOAT,
@@ -225,25 +233,113 @@ stock
 
 #if defined INTROSPECT_PLAYER_DATA
 	static stock
-		ISI_gCurrentPlayer,
-		ISI_gPlayerLocals[MAX_PLAYERS][26];
+		ISI_gCurrentPlayer = -1,
+		ISI_gPlayerInts[MAX_PLAYERS][12],  // a - l
+		ISI_gPlayerStrM[MAX_PLAYERS][144], // m
+		ISI_gPlayerStrN[MAX_PLAYERS][144], // n
+		ISI_gPlayerFlts[MAX_PLAYERS][12];  // o - z
 	
 	stock Parser_SetPlayer(pid)
 	{
-		ISI_gCurrentPlayer = pid;
-		TODO: States for errors.
+		printf("SetPlayer");
+		if ((ISI_gCurrentPlayer = pid) == -1)
+		{
+			state Parser_Error_state : Parser_Error_print;
+		}
+		else
+		{
+			state Parser_Error_state : Parser_Error_player;
+		}
 	}
 	
 	static stock Parser_GetLocalName(ptr)
 	{
 		new
-			base = ref(ISI_gPlayerLocals[ISI_gCurrentPlayer]);
-		if (base <= ptr < base + 26 * 4)
+			sInts = -1,
+			sStrM,
+			sStrN,
+			sFlts;
+		sInts = ref(ISI_gPlayerInts[ISI_gCurrentPlayer]),
+		sStrM = ref(ISI_gPlayerStrM[ISI_gCurrentPlayer]),
+		sStrN = ref(ISI_gPlayerStrN[ISI_gCurrentPlayer]),
+		sFlts = ref(ISI_gPlayerFlts[ISI_gCurrentPlayer]);
+		if (sInts <= ptr < sInts + 12 * 4)
 		{
-			return 'a' + (ptr - base) / 4;
+			return 'a' + (ptr - sInts) / 4;
+		}
+		else if (sStrM <= ptr < sStrM + 144 * 4)
+		{
+			return 'm';
+		}
+		else if (sStrN <= ptr < sStrN + 144 * 4)
+		{
+			return 'n';
+		}
+		else if (sFlts <= ptr < sFlts + 12 * 4)
+		{
+			return 'o' + (ptr - sFlts) / 4;
 		}
 		return '-';
 	}
+	
+	forward _@_ParserFuncs();
+	
+	public _@_ParserFuncs()
+	{
+		printf("");
+		format("", 0, "");
+	}
+	
+	stock _Parser_Msg(const str[], ...) <Parser_Error_state : Parser_Error_player>
+	{
+		static
+			dest[144],
+			sPar,
+			sRet,
+			sFrm;
+		// Save the header.
+		#emit LOAD.S.pri 0
+		#emit STOR.pri   sFrm
+		#emit LOAD.S.pri 4
+		#emit STOR.pri   sRet
+		#emit LOAD.S.pri 8
+		#emit STOR.pri   sPar
+		// Push the size.
+		#emit CONST.alt  144
+		#emit STOR.S.alt 8
+		// Push the destination.
+		#emit CONST.alt  dest
+		#emit STOR.S.alt 4
+		// Update the parameter count.
+		#emit ADD.C      8
+		#emit STOR.S.pri 0
+		// Call the function.
+		#emit SYSREQ.C   format
+		// Restore the header.
+		#emit LOAD.pri   sFrm
+		#emit STOR.S.pri 0
+		#emit LOAD.pri   sRet
+		#emit STOR.S.pri 4
+		#emit LOAD.pri   sPar
+		#emit STOR.S.pri 8
+		return SendClientMessage(ISI_gCurrentPlayer, (str[7] == 'E') ? 0xCD2626FF : 0xFFD700FF, dest);
+	}
+	
+	stock _Parser_Msg(const str[], {Float,_}:...) <Parser_Error_state : Parser_Error_print>
+	{
+		#pragma unused str
+		#emit STACK        8
+		#emit SYSREQ.C     printf
+		#emit STACK        0xFFFFFFF8
+		#emit RETN
+		return 0;
+	}
+	
+	#define Parser_Error(%0) _Parser_Msg("PARSER ERROR  : " %0)
+	#define Parser_Warning(%0) _Parser_Msg("PARSER WARNING: " %0)
+#else
+	#define Parser_Error(%0) print("PARSER ERROR  : " %0)
+	#define Parser_Warning(%0) print("PARSER WARNING: " %0)
 #endif
 
 /******************************************************************************\
@@ -296,12 +392,16 @@ static stock Parser_Print(token[E_TOKEN], ret[], len = sizeof (ret))
 			format(ret, len, "SYMBOL: %s", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
 		case e_TOKEN_TYPE_FUNC, e_TOKEN_TYPE_FFUNC:
 			format(ret, len, "FUNCTION: %s", GetFunctionFromAddress(token[E_TOKEN_FUNC_PTR]));
-		case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_FVAR, e_TOKEN_TYPE_ARRAY,e_TOKEN_TYPE_FARRAY:
-			format(ret, len, "VARIABLE: %s", GetVariableFromAddress(token[E_TOKEN_SYM_PTR]));
+		case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_FVAR, e_TOKEN_TYPE_ARRAY, e_TOKEN_TYPE_FARRAY:
+		{
 #if defined INTROSPECT_PLAYER_DATA
-		case e_TOKEN_TYPE_LOCAL:
-			format(ret, len, "LOCAL: %c", Parser_GetLocalName(token[E_TOKEN_SYM_PTR]));
+			new
+				ch = Parser_GetLocalName(token[E_TOKEN_SYM_PTR]);
+			if (ch != '-') format(ret, len, "LOCAL: %c", ch);
+			else
 #endif
+				format(ret, len, "VARIABLE: %s", GetVariableFromAddress(token[E_TOKEN_SYM_PTR]));
+		}
 		case e_TOKEN_TYPE_FLOAT:  format(ret, len, "FLOAT:    %.2f", token[E_TOKEN_FLOAT_VAL]);
 		case e_TOKEN_TYPE_INT:    format(ret, len, "NUMBER:   %d", token[E_TOKEN_INT_VAL]);
 		case e_TOKEN_TYPE_BOOL:   format(ret, len, "BOOLEAN:  %s", (token[E_TOKEN_BOOL_VAL]) ? ("true") : ("false"));
@@ -319,9 +419,6 @@ static stock PrettyPrint(token[E_TOKEN])
 	Parser_Print(token, str);
 	print(str);
 }
-
-#define Parser_Error(%0) printf("PARSER ERROR  : " %0)
-#define Parser_Warning(%0) printf("PARSER WARNING: " %0)
 
 static stock Parser_PeekChar()
 {
@@ -770,6 +867,39 @@ static stock Parser_GetSymbol(ret[E_TOKEN])
 		{
 			ISI_gFloatTagIndex = GetTagIdx("Float");
 		}
+#if defined INTROSPECT_PLAYER_DATA
+		{
+			if (ptr - ISI_gInputPtr == 1 && IsPlayerConnected(ISI_gCurrentPlayer))
+			{
+				new
+					ch = ISI_gInputLine[ISI_gInputPtr];
+				if ('a' <= ch <= 'l')
+				{
+					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_VAR,
+					ret[E_TOKEN_SYM_PTR] = ref(ISI_gPlayerInts[ISI_gCurrentPlayer][ch - 'a']);
+					goto Parser_GetSymbol_return;
+				}
+				else if (ch == 'm')
+				{
+					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARRAY | (e_TOKEN_TYPE:1 << TOKEN_TYPE_SHIFT),
+					ret[E_TOKEN_SYM_PTR] = ref(ISI_gPlayerStrM[ISI_gCurrentPlayer]);
+					goto Parser_GetSymbol_return;
+				}
+				else if (ch == 'n')
+				{
+					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARRAY | (e_TOKEN_TYPE:1 << TOKEN_TYPE_SHIFT),
+					ret[E_TOKEN_SYM_PTR] = ref(ISI_gPlayerStrN[ISI_gCurrentPlayer]);
+					goto Parser_GetSymbol_return;
+				}
+				else if ('o' <= ch <= 'z')
+				{
+					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FVAR,
+					ret[E_TOKEN_SYM_PTR] = ref(ISI_gPlayerFlts[ISI_gCurrentPlayer][ch - 'o']);
+					goto Parser_GetSymbol_return;
+				}
+			}
+		}
+#endif
 		{
 			// See if this symbol is an array/variable.
 			new
@@ -814,17 +944,6 @@ static stock Parser_GetSymbol(ret[E_TOKEN])
 			{
 				ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NATIVE,
 				ret[E_TOKEN_NATIVE_ADDR] = info;
-				goto Parser_GetSymbol_return;
-			}
-		}
-#endif
-#if defined INTROSPECT_PLAYER_DATA
-		{
-			TODO: Turn on IsPlayerConnected check.
-			if (ptr - ISI_gInputPtr == 1 && 'a' <= ISI_gInputLine[ISI_gInputPtr] <= 'z') // && IsPlayerConnected(ISI_gCurrentPlayer))
-			{
-				ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_LOCAL,
-				ret[E_TOKEN_SYM_PTR] = ref(ISI_gPlayerLocals[ISI_gCurrentPlayer][ISI_gInputLine[ISI_gInputPtr] - 'a']);
 				goto Parser_GetSymbol_return;
 			}
 		}
@@ -1086,7 +1205,7 @@ static stock Parser_GetLeft(prec)
 				else return pos;
 			}
 		}
-		case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_FVAR, e_TOKEN_TYPE_LOCAL:
+		case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_FVAR:
 		{
 			// Check for postfix operators.
 			new
@@ -1285,7 +1404,21 @@ stock Parser_PrintExpr(str[], size, tree[][E_TOKEN], entry)
 stock RenderToken(str[], token[E_TOKEN], size = sizeof (str))
 {
 	str[0] = '\0',
-	_Parser_PrintToken(str, size, token, false);
+	_Parser_RenderToken(str, size, token);
+}
+
+static stock _Parser_RenderToken(str[], size, token[E_TOKEN])
+{
+	switch (token[E_TOKEN_TYPE] & TOKEN_TYPE_MASK)
+	{
+		case e_TOKEN_TYPE_STRING: format(str, size, "\"%s\"", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
+		case e_TOKEN_TYPE_FLOAT:  format(str, size, "%.2f",   token[E_TOKEN_FLOAT_VAL]);
+		case e_TOKEN_TYPE_ARRAY:  ReadAmxMemoryArray(token[E_TOKEN_SYM_PTR], str, size);
+		case e_TOKEN_TYPE_FVAR:   format(str, size, "%.2f", Float:ReadAmxMemory(token[E_TOKEN_SYM_PTR]));
+		case e_TOKEN_TYPE_VAR:    format(str, size, "%d", ReadAmxMemory(token[E_TOKEN_SYM_PTR]));
+		case e_TOKEN_TYPE_INT:    valstr(str, token[E_TOKEN_INT_VAL]);
+		case e_TOKEN_TYPE_BOOL:   strcat(str, (token[E_TOKEN_BOOL_VAL]) ? ("true") : ("false"), size);
+	}
 }
 
 static stock _Parser_PrintToken(str[], size, token[E_TOKEN], bool:bracket)
@@ -1302,12 +1435,16 @@ static stock _Parser_PrintToken(str[], size, token[E_TOKEN], bool:bracket)
 		}
 		case e_TOKEN_TYPE_FUNC, e_TOKEN_TYPE_FFUNC:
 			strcat(str, GetFunctionFromAddress(token[E_TOKEN_FUNC_PTR]), size);
-		case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_FVAR, e_TOKEN_TYPE_ARRAY,e_TOKEN_TYPE_FARRAY:
-			strcat(str, GetVariableFromAddress(token[E_TOKEN_SYM_PTR]), size);
+		case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_FVAR, e_TOKEN_TYPE_ARRAY, e_TOKEN_TYPE_FARRAY:
+		{
 #if defined INTROSPECT_PLAYER_DATA
-		case e_TOKEN_TYPE_LOCAL:
-			format(str, size, "%s%c", str, Parser_GetLocalName(token[E_TOKEN_SYM_PTR]));
+			new
+				ch = Parser_GetLocalName(token[E_TOKEN_SYM_PTR]);
+			if (ch != '-') format(str, size, "%s%c", str, ch);
+			else
 #endif
+				strcat(str, GetVariableFromAddress(token[E_TOKEN_SYM_PTR]), size);
+		}
 		case e_TOKEN_TYPE_INT:    format(str, size, "%s%d",     str, token[E_TOKEN_INT_VAL]);
 		case e_TOKEN_TYPE_BOOL:   strcat(str, (token[E_TOKEN_BOOL_VAL]) ? ("true") : ("false"), size);
 		case e_TOKEN_TYPE_OP:
@@ -1520,6 +1657,12 @@ main()
 	print(output);
 	
 	Parser_SetInput("f = g = h + 55");
+	pos = Parser_BuildTree(cellmin);
+	//print(Parser_PrintTree(ISI_gParseTree, pos));
+	Parser_PrintTree(output, sizeof (output), ISI_gParseTree, pos);
+	print(output);
+	
+	Parser_SetInput("Parser_FakeThree");
 	pos = Parser_BuildTree(cellmin);
 	//print(Parser_PrintTree(ISI_gParseTree, pos));
 	Parser_PrintTree(output, sizeof (output), ISI_gParseTree, pos);
