@@ -62,7 +62,7 @@ enum E_TAG {
 	Name[32]
 }
 
-static
+static stock
 	s_Globals[INTROSPECT_MAX_GLOBALS][E_VARIABLE],
 	s_Arguments[INTROSPECT_MAX_TOTAL_ARGS][E_VARIABLE],
 	s_Functions[INTROSPECT_MAX_FUNCTIONS][E_FUNCTION],
@@ -138,7 +138,7 @@ stock ReadAmxDebugData(File:fp) {
 	s_NumTags = num_tags;
 }
 
-static ReadSymbolTable(File:fp, num_symbols, bool:read_args = false) {
+static stock ReadSymbolTable(File:fp, num_symbols, bool:read_args = false) {
 	for (new i = 0; i < num_symbols; i++) {
 		new address = freadcell(fp);
 		new tag = freadshort(fp);
@@ -245,7 +245,7 @@ stock GetVariableIdx(const name[]) {
 stock GetFunctionInfo(const name[], info[E_FUNCTION]) {
 	new i = GetFunctionIdx(name);
 	
-	if (idx == -1) {
+	if (i == -1) {
 		return false;
 	}
 	
@@ -257,7 +257,7 @@ stock GetFunctionInfo(const name[], info[E_FUNCTION]) {
 stock GetVariableInfo(const name[], info[E_VARIABLE]) {
 	new i = GetVariableIdx(name);
 	
-	if (idx == -1) {
+	if (i == -1) {
 		return false;
 	}
 	
@@ -387,7 +387,7 @@ stock GetStringFromVariableValue(output[], maxlength = sizeof(output), const inf
 }
 
 // Read a single cell
-static freadcell(File:fp) {
+static stock freadcell(File:fp) {
 	new buf[1];
 	
 	fblockread(fp, buf);
@@ -396,7 +396,7 @@ static freadcell(File:fp) {
 }
 
 // Read a 16-bit integer
-static freadshort(File:fp) {
+static stock freadshort(File:fp) {
 	new buf[1];
 	
 	fblockread(fp, buf);
@@ -406,12 +406,12 @@ static freadshort(File:fp) {
 }
 
 // Read a single byte
-static freadbyte(File:fp) {
+static stock freadbyte(File:fp) {
 	return fgetchar(fp, 0, false);
 }
 
 // Read a zero-terminated string
-static freadstr(File:fp, buf[], maxlength = sizeof(buf)) {
+static stock freadstr(File:fp, buf[], maxlength = sizeof(buf)) {
 	new i = 0, c;
 	
 	buf[i] = '\0';

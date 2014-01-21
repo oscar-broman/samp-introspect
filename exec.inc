@@ -103,8 +103,8 @@ static stock e_TOKEN_TYPE:Exec_ResolveTags(const l[E_TOKEN], const r[E_TOKEN], &
 	{
 		// Some floats.
 		return
-			lr = MF(l),
-			rr = MF(r),
+			lr = _:MF(l),
+			rr = _:MF(r),
 			e_TOKEN_TYPE_FLOAT;
 	}
 	else
@@ -450,9 +450,14 @@ static stock e_TOKEN_TYPE:Exec_ResolveInt(const l[E_TOKEN], const r[E_TOKEN], &l
 				case e_TOKEN_TYPE_ARR@1: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_VAR, ret[E_TOKEN_SYM_PTR] = rr;
 				case e_TOKEN_TYPE_ARR@2: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@1, ret[E_TOKEN_SYM_PTR] = Exec_LoadAddress(rr);
 				case e_TOKEN_TYPE_ARR@3: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@2, ret[E_TOKEN_SYM_PTR] = Exec_LoadAddress(rr);
-				case e_TOKEN_TYPE_FARR@1: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FVAR, l[E_TOKEN_SYM_PTR] + (rr * 4);
+				case e_TOKEN_TYPE_ARR@4: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@3, ret[E_TOKEN_SYM_PTR] = Exec_LoadAddress(rr);
+				case e_TOKEN_TYPE_ARR@5: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@4, ret[E_TOKEN_SYM_PTR] = Exec_LoadAddress(rr);
+				case e_TOKEN_TYPE_FARR@1: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FVAR, ret[E_TOKEN_SYM_PTR] = rr;
 				case e_TOKEN_TYPE_FARR@2: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@1, ret[E_TOKEN_SYM_PTR] = Exec_LoadAddress(rr);
 				case e_TOKEN_TYPE_FARR@3: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@2, ret[E_TOKEN_SYM_PTR] = Exec_LoadAddress(rr);
+				case e_TOKEN_TYPE_FARR@4: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@3, ret[E_TOKEN_SYM_PTR] = Exec_LoadAddress(rr);
+				case e_TOKEN_TYPE_FARR@5: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@4, ret[E_TOKEN_SYM_PTR] = Exec_LoadAddress(rr);
+				default: Parser_Error("Invalid subscript or not an array.");
 			}
 		}
 		default: ret = t;
@@ -473,6 +478,8 @@ static stock e_TOKEN_TYPE:Exec_ResolveInt(const l[E_TOKEN], const r[E_TOKEN], &l
 #undef EXEC_NOT_LVALUE
 
 #if defined INTROSPECT_EXEC_TEST
+
+#include "..\amx\amx_memory"
 
 main()
 {
@@ -569,15 +576,44 @@ main()
 	
 	MAKE_TOKEN(l, e_TOKEN_TYPE_NONE, 0),
 	MAKE_TOKEN(r, e_TOKEN_TYPE_NUM, 7),
-	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_SUB),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_NEG),
 	res = Exec_ExecToken(op, l, r);
 	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_NUM, -7}));
 	
 	MAKE_TOKEN(l, e_TOKEN_TYPE_NONE, 0),
 	MAKE_TOKEN(r, e_TOKEN_TYPE_FLOAT, _:88.43),
-	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_SUB),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_NEG),
 	res = Exec_ExecToken(op, l, r);
 	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_FLOAT, _:-88.43}));
+	
+	new testArr[55][66];
+	
+	MAKE_TOKEN(l, e_TOKEN_TYPE_ARR@2, ref(testArr)),
+	MAKE_TOKEN(r, e_TOKEN_TYPE_NUM, 5),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_ARR, 0),
+	res = Exec_ExecToken(op, l, r);
+	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_ARR@1, ReadAmxMemory(ref(testArr) + 20)}));
+	
+	new testVar;
+	
+	MAKE_TOKEN(l, e_TOKEN_TYPE_VAR, ref(testVar)),
+	MAKE_TOKEN(r, e_TOKEN_TYPE_NUM, 7),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_ASSIGN),
+	res = Exec_ExecToken(op, l, r);
+	printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_NUM, 7}));
+	printf("%d", testVar);
+	
+	new testA2[10];
+	
+	MAKE_TOKEN(l, e_TOKEN_TYPE_ARR@1, ref(testA2)),
+	MAKE_TOKEN(r, e_TOKEN_TYPE_NUM, 5),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_ARR, 0),
+	res = Exec_ExecToken(op, l, r);
+	MAKE_TOKEN(r, e_TOKEN_TYPE_NUM, 42),
+	MAKE_TOKEN(op, e_TOKEN_TYPE_OP, e_TOKEN_OP_ASSIGN),
+	res = Exec_ExecToken(op, res, r);
+	//printf("%d", COMPARE_PARSER_TOKEN(res, {e_TOKEN_TYPE_NUM, 7}));
+	printf("%d", testA2[5]);
 }
 
 #endif

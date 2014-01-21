@@ -7,6 +7,22 @@
 	#define TODO:%9\32;%0\10;%1 { new TODO; print("TODO: \"%0\""); }
 #endif
 
+#include "introspect"
+
+#tryinclude "amx_assembly\amx_header"
+#tryinclude "amx\amx_header"
+#tryinclude <amx_assembly\amx_header>
+#tryinclude <amx\amx_header>
+
+#tryinclude "amx_assembly\dynamic_call"
+#tryinclude "amx\dynamic_call"
+#tryinclude <amx_assembly\dynamic_call>
+#tryinclude <amx\dynamic_call>
+
+#if !defined SysreqCN
+	#error amx_assembly is required. Get it here: github.com/Zeex/amx_assembly
+#endif
+
 enum e_TOKEN_OP
 {
 	e_TOKEN_OP_NONE,
@@ -76,6 +92,7 @@ enum e_TOKEN_TYPE
 	// These two are distinct for simplicity.
 	e_TOKEN_TYPE_NATIVE,
 	e_TOKEN_TYPE_FUNC,
+	e_TOKEN_TYPE_FFUNC,
 	// This makes the code quite context-aware.
 	e_TOKEN_TYPE_VAR,  // Regular variable.
 	e_TOKEN_TYPE_FVAR, // Float variable.
@@ -113,6 +130,7 @@ enum E_TOKEN
 	E_TOKEN_SYM_PTR = 1,
 	E_TOKEN_STRING_IDX = 1,
 	E_TOKEN_NATIVE_IDX = 1,
+	E_TOKEN_FUNC_PTR = 1,
 	E_TOKEN_LEFT,
 	E_TOKEN_RIGHT,
 	//_E_TOKEN_TEMP_STRING[32],
@@ -251,7 +269,8 @@ static stock Parser_Print(token[E_TOKEN], ret[], len = sizeof (ret))
 		case e_TOKEN_TYPE_NONE:   ret[0] = '\0';
 		case e_TOKEN_TYPE_STRING: format(ret, len, "STRING:   %s", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
 		case e_TOKEN_TYPE_NATIVE: format(ret, len, "NATIVE:   %s", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
-		case e_TOKEN_TYPE_FUNC:   format(ret, len, "FUNCTION: %s", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
+		case e_TOKEN_TYPE_FUNC,
+		     e_TOKEN_TYPE_FFUNC:  format(ret, len, "FUNCTION: %s", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
 		case e_TOKEN_TYPE_VAR:    format(ret, len, "VARIABLE: %s", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
 		case e_TOKEN_TYPE_FLOAT:  format(ret, len, "FLOAT:    %.2f", token[E_TOKEN_FLOAT_VAL]);
 		case e_TOKEN_TYPE_NUM:    format(ret, len, "NUMBER:   %d", token[E_TOKEN_NUM_VAL]);
@@ -431,46 +450,75 @@ static stock Parser_GetNextToken(ret[E_TOKEN])
 		{
 			Parser_GetSymbol(ret);
 			// Resolve the symbol
-			switch (ret[E_TOKEN_TYPE])
+			if (ret[E_TOKEN_TYPE] == e_TOKEN_TYPE_VAR)
 			{
-				case e_TOKEN_TYPE_VAR:
+				// See if this symbol is an array.
 				{
-					// Will currently have "E_TOKEN_STRING_IDX" set.
 					new
 						idx = ret[E_TOKEN_STRING_IDX],
 						info[E_VARIABLE];
-					/*
-						Address,
-						Tag,
-						CodeStart,
-						CodeEnd,
-						Ident,
-						Name[32],
-						Dimensions,
-						DimensionSize[3],
-						DimensionTag[3]
-					*/
-					GetVariableInfo(ISI_gsStringTable[idx], info);
-					// Preserve the tag.
-					if (ISI_gFloatTagIndex == -1) ISI_gFloatTagIndex = GetTagIdx("Float");
-					// Preserve the dimension information.
-					if (info[Tag] == ISI_gFloatTagIndex) switch (info[Dimensions])
+					if (GetVariableInfo(ISI_gsStringTable[idx], info))
 					{
-						case 0: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FVAR;
-						case 1: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@1;
-						case 2: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@2;
-						case 3: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@3;
+						// Preserve the tag.
+						if (ISI_gFloatTagIndex == -1) ISI_gFloatTagIndex = GetTagIdx("Float");
+						// Preserve the dimension information.
+						if (info[Tag] == ISI_gFloatTagIndex) switch (info[Dimensions])
+						{
+							case 0: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FVAR;
+							case 1: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@1;
+							case 2: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@2;
+							case 3: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@3;
+							case 4: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@4;
+							case 5: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@5;
+						}
+						else switch (info[Dimensions])
+						{
+							case 1: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@1;
+							case 2: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@2;
+							case 3: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@3;
+							case 4: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@4;
+							case 5: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@5;
+						}
+						return
+							// Convert to a pointer.
+							ret[E_TOKEN_SYM_PTR] = info[Address],
+							// Remove this string from the table.
+							ISI_gsStringEnd = idx,
+							1;
 					}
-					else switch (info[Dimensions])
+				}
+				// See if this symbol is a normal function.
+				{
+					new
+						idx = ret[E_TOKEN_STRING_IDX],
+						info[E_FUNCTION];
+					if (GetFunctionInfo(ISI_gsStringTable[idx], info))
 					{
-						case 1: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@1;
-						case 2: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@2;
-						case 3: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@3;
+						if (ISI_gFloatTagIndex == -1) ISI_gFloatTagIndex = GetTagIdx("Float");
+						if (info[Tag] == ISI_gFloatTagIndex) ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FFUNC;
+						else ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FUNC;
+						return
+							ret[E_TOKEN_FUNC_PTR] = info[Address],
+							ISI_gsStringEnd = idx,
+							1;
 					}
-					// Convert to a pointer.
-					ret[E_TOKEN_SYM_PTR] = info[Address];
-					// Remove this string from the table.
-					ISI_gsStringEnd = idx;
+				}
+				// See if this symbol is a native function.
+#if defined INTROSPECT_NATIVES
+				{
+					new
+						idx = ret[E_TOKEN_STRING_IDX],
+						info = GetNativeIndexFromName(ISI_gsStringTable[idx]);
+					if (info != -1)
+					{
+						return
+							ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NATIVE,
+							ret[E_TOKEN_NATIVE_IDX] = info,
+							ISI_gsStringEnd = idx,
+							1;
+					}
+				}
+#endif
 			}
 		}
 		case '"': Parser_GetString(ret);
@@ -772,42 +820,6 @@ static stock Parser_GetSymbol(ret[E_TOKEN])
 			ISI_gInputLine[(ISI_gInputPtr = ptr)] = tmp,
 			1;
 	}
-	TODO: Keywords (if I want them - I`m only doing expressions ATM).
-	TODO: Add constants.
-/*	#if defined INTROSPECT_CONSTANTS
-		if (Parser_GetConstant(ISI_gInputLine[ISI_gInputPtr], ret))
-		{
-			// Pass it floats and integers from things like "MAX_PLAYERS".
-			goto Parser_GetSymbol_return;
-		}
-	#endif
-	// Get the variable pointer.
-	{
-		new
-			symDat[E_VARIABLE];
-		if (GetVariableInfo(ISI_gInputLine[ISI_gInputPtr], symDat))
-		{
-			ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_VAR,
-			ret[E_TOKEN_SYM_PTR] = symDat[Address];
-			goto Parser_GetSymbol_return;
-		}
-	}
-	// Get the function pointer.
-	if ((ret[E_TOKEN_SYM_PTR] = GetFunctionAddress(ISI_gInputLine[ISI_gInputPtr])) != -1)
-	{
-		ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FUNC;
-		goto Parser_GetSymbol_return;
-	}
-	// Get the native index.
-	#if defined INTROSPECT_NATIVES
-		if ((ret[E_TOKEN_NATIVE_IDX] = GetNativeIndexFromName(ISI_gInputLine[ISI_gInputPtr])) != -1)
-		{
-			ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NATIVE;
-			goto Parser_GetSymbol_return;
-		}
-	#endif
-	Parser_Error("Unknown symbol: %s", ISI_gInputLine[ISI_gInputPtr]);
-Parser_GetSymbol_return:*/
 	return
 		ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_VAR,
 		ret[E_TOKEN_STRING_IDX] = Parser_AddString(ISI_gInputPtr),
@@ -1115,7 +1127,7 @@ static stock _Parser_PrintToken(str[], size, token[E_TOKEN], bool:bracket)
 	{
 		case e_TOKEN_TYPE_STRING: format(str, size, "%s\"%s\"", str, ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
 		case e_TOKEN_TYPE_FLOAT:  format(str, size, "%s%.2f",   str, token[E_TOKEN_FLOAT_VAL]);
-		case e_TOKEN_TYPE_NATIVE, e_TOKEN_TYPE_FUNC, e_TOKEN_TYPE_VAR:
+		case e_TOKEN_TYPE_NATIVE, e_TOKEN_TYPE_FUNC, e_TOKEN_TYPE_FFUNC, e_TOKEN_TYPE_VAR:
 			strcat(str, ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]], size);
 		case e_TOKEN_TYPE_NUM:    format(str, size, "%s%d",     str, token[E_TOKEN_NUM_VAL]);
 		case e_TOKEN_TYPE_BOOL:   strcat(str, (token[E_TOKEN_BOOL_VAL]) ? ("true") : ("false"), size);
