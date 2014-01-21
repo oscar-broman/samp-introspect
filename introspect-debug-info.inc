@@ -222,6 +222,32 @@ static stock ReadSymbolTable(File:fp, num_symbols, bool:read_args = false) {
 	}
 }
 
+stock GetFunctionFromAddress(address) {
+	new ret[48];
+	
+	for (new i = 0; i < s_NumFunctions; i++) {
+		if (address == s_Functions[i][Address]) {
+			strcat(ret, s_Functions[i][Name]);
+			break;
+		}
+	}
+	
+	return ret;
+}
+
+stock GetVariableFromAddress(address) {
+	new ret[32];
+	
+	for (new i = 0; i < s_NumGlobals; i++) {
+		if (address == s_Globals[i][Address]) {
+			strcat(ret, s_Globals[i][Name]);
+			break;
+		}
+	}
+	
+	return ret;
+}
+
 stock GetFunctionIdx(const name[]) {
 	for (new i = 0; i < s_NumFunctions; i++) {
 		if (!strcmp(name, s_Functions[i][Name])) {
