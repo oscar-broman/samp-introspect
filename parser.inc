@@ -9,22 +9,21 @@
 
 #include "introspect"
 
-#tryinclude "amx_assembly\amx_header"
-#tryinclude "amx\amx_header"
-#tryinclude <amx_assembly\amx_header>
-#tryinclude <amx\amx_header>
-
 #if !defined ref
 	#error amx_assembly is required. Get it here: github.com/Zeex/amx_assembly
 #endif
 
 #tryinclude "amx_assembly\amx_header"
 #tryinclude "amx\amx_header"
+#tryinclude "..\amx_assembly\amx_header"
+#tryinclude "..\amx\amx_header"
 #tryinclude <amx_assembly\amx_header>
 #tryinclude <amx\amx_header>
 
 #tryinclude "amx_assembly\dynamic_call"
 #tryinclude "amx\dynamic_call"
+#tryinclude "..\amx_assembly\dynamic_call"
+#tryinclude "..\amx\dynamic_call"
 #tryinclude <amx_assembly\dynamic_call>
 #tryinclude <amx\dynamic_call>
 
@@ -241,7 +240,6 @@ stock
 	
 	stock Parser_SetPlayer(pid)
 	{
-		printf("SetPlayer");
 		if ((ISI_gCurrentPlayer = pid) == -1)
 		{
 			state Parser_Error_state : Parser_Error_print;
@@ -870,13 +868,13 @@ static stock Parser_GetSymbol(ret[E_TOKEN])
 				else if (ch == 'm')
 				{
 					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARRAY | (e_TOKEN_TYPE:1 << TOKEN_TYPE_SHIFT),
-					ret[E_TOKEN_SYM_PTR] = ref(ISI_gPlayerStrM[ISI_gCurrentPlayer]);
+					ret[E_TOKEN_SYM_PTR] = ref(ISI_gPlayerStrM[ISI_gCurrentPlayer][0]);
 					goto Parser_GetSymbol_return;
 				}
 				else if (ch == 'n')
 				{
 					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARRAY | (e_TOKEN_TYPE:1 << TOKEN_TYPE_SHIFT),
-					ret[E_TOKEN_SYM_PTR] = ref(ISI_gPlayerStrN[ISI_gCurrentPlayer]);
+					ret[E_TOKEN_SYM_PTR] = ref(ISI_gPlayerStrN[ISI_gCurrentPlayer][0]);
 					goto Parser_GetSymbol_return;
 				}
 				else if ('o' <= ch <= 'z')

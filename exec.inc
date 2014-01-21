@@ -383,7 +383,6 @@ static stock Exec_ExecToken(const t[E_TOKEN], const l[E_TOKEN], const r[E_TOKEN]
 				case e_TOKEN_TYPE_FLOAT: TODO: Store data and take reference.
 				case e_TOKEN_TYPE_FVAR, e_TOKEN_TYPE_VAR:
 					// Store the pointer as a number.
-					printf("push ref %d", r[E_TOKEN_SYM_PTR]),
 					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_INT,
 					ret[E_TOKEN_INT_VAL] = r[E_TOKEN_SYM_PTR];
 				default:
@@ -576,8 +575,10 @@ static stock Exec_PushParams(tree[][E_TOKEN], entry)
 		return
 			1;
 	}
+	new
+		ret = Exec_PushParams(tree, tree[entry][E_TOKEN_LEFT]) + 1;
 	Exec_PushOne(tree, tree[entry][E_TOKEN_RIGHT]);
-	return Exec_PushParams(tree, tree[entry][E_TOKEN_LEFT]) + 1;
+	return ret;
 }
 
 static stock Exec_Evaluate(token[E_TOKEN], tree[][E_TOKEN], entry)
