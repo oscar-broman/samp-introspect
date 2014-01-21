@@ -95,35 +95,28 @@ enum e_TOKEN_TYPE
 	e_TOKEN_TYPE_FUNC,
 	e_TOKEN_TYPE_FFUNC,
 	// This makes the code quite context-aware.
-	e_TOKEN_TYPE_VAR,  // Regular variable.
-	e_TOKEN_TYPE_FVAR, // Float variable.
+	e_TOKEN_TYPE_LOCAL, // Special variable.
+	e_TOKEN_TYPE_VAR,   // Regular variable.
+	e_TOKEN_TYPE_FVAR,  // Float variable.
 	e_TOKEN_TYPE_FLOAT,
 	e_TOKEN_TYPE_BOOL,
-	e_TOKEN_TYPE_NUM,
-	e_TOKEN_TYPE_APP,
-	e_TOKEN_TYPE_ARR,
+	e_TOKEN_TYPE_INT,
+	e_TOKEN_TYPE_APPLY,
+	e_TOKEN_TYPE_INDEX,
 	//e_TOKEN_TYPE_MD,   // This is used when we have a multi-dimensional array.
 	e_TOKEN_TYPE_OP,
 	// Special types for unresolved arrays.
-	e_TOKEN_TYPE_ARR@0,
-	e_TOKEN_TYPE_ARR@1,
-	e_TOKEN_TYPE_ARR@2,
-	e_TOKEN_TYPE_ARR@3,
-	e_TOKEN_TYPE_ARR@4,
-	e_TOKEN_TYPE_ARR@5,
-	e_TOKEN_TYPE_FARR@1,
-	e_TOKEN_TYPE_FARR@2,
-	e_TOKEN_TYPE_FARR@3,
-	e_TOKEN_TYPE_FARR@4,
-	e_TOKEN_TYPE_FARR@5,
+	e_TOKEN_TYPE_ARRAY,
+	e_TOKEN_TYPE_FARRAY,
 }
 
-#define TOKEN_ARRAY_CASES e_TOKEN_TYPE_ARR@1,e_TOKEN_TYPE_ARR@2,e_TOKEN_TYPE_ARR@3,e_TOKEN_TYPE_ARR@4,e_TOKEN_TYPE_ARR@5,e_TOKEN_TYPE_FARR@1,e_TOKEN_TYPE_FARR@2,e_TOKEN_TYPE_FARR@3,e_TOKEN_TYPE_FARR@4,e_TOKEN_TYPE_FARR@5
+#define TOKEN_TYPE_MASK  (e_TOKEN_TYPE:0x3F)
+#define TOKEN_TYPE_SHIFT (e_TOKEN_TYPE:6)
 
 enum E_TOKEN
 {
 	e_TOKEN_TYPE:E_TOKEN_TYPE,
-	E_TOKEN_NUM_VAL = 1,
+	E_TOKEN_INT_VAL = 1,
 	Float:E_TOKEN_FLOAT_VAL = 1,
 	bool:E_TOKEN_BOOL_VAL = 1,
 	e_TOKEN_OP:E_TOKEN_OP = 1,
@@ -136,11 +129,11 @@ enum E_TOKEN
 	//_E_TOKEN_TEMP_STRING[32],
 }
 
-#define COMPARE_PARSER_TOKEN(%0,{%1,%2}) (((%0[E_TOKEN_TYPE]) == (%1)) && ((%0[E_TOKEN_NUM_VAL]) == (%2)))
+#define COMPARE_PARSER_TOKEN(%0,{%1,%2}) (((%0[E_TOKEN_TYPE]) == (%1)) && ((%0[E_TOKEN_INT_VAL]) == (%2)))
 #define MAKE_PARSER_TOKEN(%0,%1,%2,%3) {%0, %1, Float:%2, bool:%3}
 #define EMPTY_PARSER_TOKEN MAKE_PARSER_TOKEN(e_TOKEN_TYPE_NONE, 0, -1, -1)
 
-#define MAKE_TOKEN(%0,%1,%2) %0[E_TOKEN_TYPE]=%1,%0[E_TOKEN_NUM_VAL]=%2,%0[E_TOKEN_LEFT]=%0[E_TOKEN_RIGHT]=-1
+#define MAKE_TOKEN(%0,%1,%2) %0[E_TOKEN_TYPE]=%1,%0[E_TOKEN_INT_VAL]=%2,%0[E_TOKEN_LEFT]=%0[E_TOKEN_RIGHT]=-1
 
 enum E_OPERATOR_DATA
 {
@@ -229,6 +222,23 @@ static stock
 	ISI_gsStringEnd,
 	ISI_gsStringTable[32] = {-1, ...};
 
+#if defined INTROSPECT_PLAYER_DATA
+	static stock
+		ISI_gCurrentPlayer,
+		ISI_gPlayerLocals[MAX_PLAYERS][26];
+	
+	static stock Parser_GetLocalName(ptr)
+	{
+		new
+			base = ref(ISI_gPlayerLocals[ISI_gCurrentPlayer]);
+		if (base <= ptr < base + 26 * 4)
+		{
+			return 'a' + (ptr - base) / 4;
+		}
+		return '-';
+	}
+#endif
+
 /******************************************************************************\
 |******************************************************************************|
 |******************************************************************************|
@@ -265,7 +275,7 @@ static stock Parser_PrintOp(e_TOKEN_OP:op)
 
 static stock Parser_Print(token[E_TOKEN], ret[], len = sizeof (ret))
 {
-	switch (token[E_TOKEN_TYPE])
+	switch (token[E_TOKEN_TYPE] & TOKEN_TYPE_MASK)
 	{
 		case e_TOKEN_TYPE_NONE:   ret[0] = '\0';
 		case e_TOKEN_TYPE_STRING: format(ret, len, "STRING:   %s", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
@@ -279,14 +289,18 @@ static stock Parser_Print(token[E_TOKEN], ret[], len = sizeof (ret))
 			format(ret, len, "SYMBOL: %s", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
 		case e_TOKEN_TYPE_FUNC, e_TOKEN_TYPE_FFUNC:
 			format(ret, len, "FUNCTION: %s", GetFunctionFromAddress(token[E_TOKEN_FUNC_PTR]));
-		case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_FVAR, TOKEN_ARRAY_CASES:
+		case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_FVAR, e_TOKEN_TYPE_ARRAY,e_TOKEN_TYPE_FARRAY:
 			format(ret, len, "VARIABLE: %s", GetVariableFromAddress(token[E_TOKEN_SYM_PTR]));
+#if defined INTROSPECT_PLAYER_DATA
+		case e_TOKEN_TYPE_LOCAL:
+			format(ret, len, "LOCAL: %c", Parser_GetLocalName(token[E_TOKEN_SYM_PTR]));
+#endif
 		case e_TOKEN_TYPE_FLOAT:  format(ret, len, "FLOAT:    %.2f", token[E_TOKEN_FLOAT_VAL]);
-		case e_TOKEN_TYPE_NUM:    format(ret, len, "NUMBER:   %d", token[E_TOKEN_NUM_VAL]);
+		case e_TOKEN_TYPE_INT:    format(ret, len, "NUMBER:   %d", token[E_TOKEN_INT_VAL]);
 		case e_TOKEN_TYPE_BOOL:   format(ret, len, "BOOLEAN:  %s", (token[E_TOKEN_BOOL_VAL]) ? ("true") : ("false"));
 		case e_TOKEN_TYPE_OP:     format(ret, len, "OPERATOR: %s", Parser_PrintOp(token[E_TOKEN_OP]));
-		case e_TOKEN_TYPE_APP: ret[0] = '\0', strcat(ret, "APPLY", len);
-		case e_TOKEN_TYPE_ARR: ret[0] = '\0', strcat(ret, "INDEX", len);
+		case e_TOKEN_TYPE_APPLY: ret[0] = '\0', strcat(ret, "APPLY", len);
+		case e_TOKEN_TYPE_INDEX: ret[0] = '\0', strcat(ret, "INDEX", len);
 		//case e_TOKEN_TYPE_MD:  ret[0] = '\0', strcat(ret, "INDEX", len);
 		default: ret[0] = '\0', strcat(ret, "<unknown>", len);
 	}
@@ -322,10 +336,10 @@ static stock Parser_PeekToken()
 	switch (Parser_PeekChar())
 	{
 		case '\0': {}
-		case '0' .. '9': ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NUM;
+		case '0' .. '9': ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_INT;
 		case 'a' .. 'z', 'A' .. 'Z', '_', '@': ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_SYMBOL;
 		case '"': ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_STRING;
-		case '\'': ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NUM;
+		case '\'': ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_INT;
 		default: Parser_GetOp(ret);
 	}
 	return
@@ -453,78 +467,6 @@ static stock Parser_GetNextToken(ret[E_TOKEN])
 		{
 			// printf("%s", ISI_gInputLine[ISI_gInputPtr]);
 			Parser_GetSymbol(ret);
-			// Resolve the symbol
-			if (ret[E_TOKEN_TYPE] == e_TOKEN_TYPE_SYMBOL)
-			{
-				new
-				idx = ret[E_TOKEN_STRING_IDX];
-				// See if this symbol is an array.
-				{
-					new
-						info[E_VARIABLE];
-					if (GetVariableInfo(ISI_gInputLine[ISI_gsStringTable[idx]], info))
-					{
-						// Preserve the tag.
-						if (ISI_gFloatTagIndex == -1) ISI_gFloatTagIndex = GetTagIdx("Float");
-						// Preserve the dimension information.
-						if (info[Tag] == ISI_gFloatTagIndex) switch (info[Dimensions])
-						{
-							case 0: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FVAR;
-							case 1: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@1;
-							case 2: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@2;
-							case 3: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@3;
-							case 4: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@4;
-							case 5: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARR@5;
-						}
-						else switch (info[Dimensions])
-						{
-							case 0: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_VAR;
-							case 1: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@1;
-							case 2: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@2;
-							case 3: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@3;
-							case 4: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@4;
-							case 5: ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR@5;
-						}
-						return
-							// Convert to a pointer.
-							ret[E_TOKEN_SYM_PTR] = info[Address],
-							// Remove this string from the table.
-							ISI_gsStringEnd = idx,
-							1;
-					}
-				}
-				// See if this symbol is a normal function.
-				{
-					new
-						info[E_FUNCTION];
-					if (GetFunctionInfo(ISI_gInputLine[ISI_gsStringTable[idx]], info))
-					{
-						if (ISI_gFloatTagIndex == -1) ISI_gFloatTagIndex = GetTagIdx("Float");
-						if (info[Tag] == ISI_gFloatTagIndex) ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FFUNC;
-						else ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FUNC;
-						return
-							ret[E_TOKEN_FUNC_PTR] = info[Address],
-							ISI_gsStringEnd = idx,
-							1;
-					}
-				}
-				// See if this symbol is a native function.
-#if defined INTROSPECT_NATIVES
-				{
-					new
-						info = GetNativeIndexFromName(ISI_gInputLine[ISI_gsStringTable[idx]]);
-					if (info != -1)
-					{
-						return
-							ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NATIVE,
-							ret[E_TOKEN_NATIVE_IDX] = info,
-							ISI_gsStringEnd = idx,
-							1;
-					}
-				}
-#endif
-				Parser_Error("Unknown symbol: %s", ISI_gInputLine[ISI_gsStringTable[idx]]);
-			}
 		}
 		case '"': Parser_GetString(ret);
 		case '\'': Parser_GetChar(ret);
@@ -562,9 +504,9 @@ static stock Parser_DoHex(ret[E_TOKEN])
 		num = (num << 4) | cur;
 	}
 	//new
-	//	ret[E_TOKEN] = {e_TOKEN_TYPE_NUM, 0};
+	//	ret[E_TOKEN] = {e_TOKEN_TYPE_INT, 0};
 	return
-		ret[E_TOKEN_NUM_VAL] = num,
+		ret[E_TOKEN_INT_VAL] = num,
 		ISI_gInputPtr = ptr,
 		1;
 }
@@ -582,7 +524,7 @@ static stock Parser_DoDecimal(ret[E_TOKEN])
 			num = num * 10 + cur;
 		}
 		return
-			ret[E_TOKEN_NUM_VAL] = num,
+			ret[E_TOKEN_INT_VAL] = num,
 			ISI_gInputPtr = ptr,
 			1;
 	}
@@ -611,9 +553,9 @@ static stock Parser_DoBinary(ret[E_TOKEN])
 		num = (num << 1) | cur;
 	}
 	//new
-	//	ret[E_TOKEN] = {e_TOKEN_TYPE_NUM, 0};
+	//	ret[E_TOKEN] = {e_TOKEN_TYPE_INT, 0};
 	return
-		ret[E_TOKEN_NUM_VAL] = num,
+		ret[E_TOKEN_INT_VAL] = num,
 		ISI_gInputPtr = ptr,
 		1;
 }
@@ -639,9 +581,9 @@ static stock Parser_DoOctal(ret[E_TOKEN])
 		num = (num << 3) | cur;
 	}
 	//new
-	//	ret[E_TOKEN] = {e_TOKEN_TYPE_NUM, 0};
+	//	ret[E_TOKEN] = {e_TOKEN_TYPE_INT, 0};
 	return
-		ret[E_TOKEN_NUM_VAL] = num,
+		ret[E_TOKEN_INT_VAL] = num,
 		ISI_gInputPtr = ptr,
 		1;
 }
@@ -721,7 +663,7 @@ static stock Parser_GetNumber(ret[E_TOKEN])
 		num = 0,
 		ch,
 		ptr = ISI_gInputPtr;
-	ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NUM;
+	ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_INT;
 	if (ISI_gInputLine[ptr] == '0')
 	{
 		// Hex, binary, or octal (or 0).
@@ -765,7 +707,7 @@ static stock Parser_GetNumber(ret[E_TOKEN])
 		}
 	}
 	return
-		ret[E_TOKEN_NUM_VAL] = num,
+		ret[E_TOKEN_INT_VAL] = num,
 		// Decimal (default).
 		ISI_gInputPtr = ptr,
 		1;
@@ -816,8 +758,75 @@ static stock Parser_GetSymbol(ret[E_TOKEN])
 		ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_BOOL,
 		ret[E_TOKEN_BOOL_VAL] = true;
 	else
+	{
+		if (ISI_gFloatTagIndex == -1)
+		{
+			ISI_gFloatTagIndex = GetTagIdx("Float");
+		}
+		{
+			// See if this symbol is an array/variable.
+			new
+				info[E_VARIABLE];
+			if (GetVariableInfo(ISI_gInputLine[ISI_gInputPtr], info))
+			{
+				// Preserve the tag.
+				// Preserve the dimension information.
+				if (info[Tag] == ISI_gFloatTagIndex) // switch (info[Dimensions])
+				{
+					if (info[Dimensions]) ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FARRAY | (e_TOKEN_TYPE:info[Dimensions] << TOKEN_TYPE_SHIFT);
+					else ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FVAR;
+				}
+				else
+				{
+					if (info[Dimensions]) ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARRAY | (e_TOKEN_TYPE:info[Dimensions] << TOKEN_TYPE_SHIFT);
+					else ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_VAR;
+				}
+				// Convert to a pointer.
+				ret[E_TOKEN_SYM_PTR] = info[Address];
+				goto Parser_GetSymbol_return;
+			}
+		}
+		{
+			// See if this symbol is a normal function.
+			new
+				info[E_FUNCTION];
+			if (GetFunctionInfo(ISI_gInputLine[ISI_gInputPtr], info))
+			{
+				if (info[Tag] == ISI_gFloatTagIndex) ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FFUNC;
+				else ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FUNC;
+				ret[E_TOKEN_FUNC_PTR] = info[Address];
+				goto Parser_GetSymbol_return;
+			}
+		}
+#if defined INTROSPECT_NATIVES
+		{
+			// See if this symbol is a native function.
+			new
+				info = GetNativeIndexFromName(ISI_gInputLine[ISI_gInputPtr]);
+			if (info != -1)
+			{
+				ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NATIVE,
+				ret[E_TOKEN_NATIVE_IDX] = info;
+				goto Parser_GetSymbol_return;
+			}
+		}
+#endif
+#if defined INTROSPECT_PLAYER_DATA
+		{
+			if (ptr - ISI_gInputPtr == 1 && 'a' <= ISI_gInputLine[ISI_gInputPtr] <= 'z') // && IsPlayerConnected(ISI_gCurrentPlayer))
+			{
+				ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_LOCAL,
+				ret[E_TOKEN_SYM_PTR] = ref(ISI_gPlayerLocals[ISI_gCurrentPlayer][ISI_gInputLine[ISI_gInputPtr] - 'a']);
+				goto Parser_GetSymbol_return;
+			}
+		}
+#endif
+		// Unknown symbol.
 		ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_SYMBOL,
 		ret[E_TOKEN_STRING_IDX] = Parser_AddString(ISI_gInputPtr);
+		Parser_Error("Unknown symbol: %s", ISI_gInputLine[ISI_gsStringTable[ret[E_TOKEN_STRING_IDX]]]);
+	}
+Parser_GetSymbol_return:
 	return
 		ISI_gInputLine[ptr] = tmp,
 		ISI_gInputPtr = ptr,
@@ -833,7 +842,7 @@ static stock Parser_GetSymbol(ret[E_TOKEN])
 \******************************************************************************/
 static stock Parser_DoChar()
 {
-	//ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NUM;
+	//ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_INT;
 	new
 		ch,
 		ret[E_TOKEN];
@@ -869,14 +878,14 @@ static stock Parser_DoChar()
 		}
 		default: return ch;
 	}
-	return ret[E_TOKEN_NUM_VAL];
+	return ret[E_TOKEN_INT_VAL];
 }
 
 static stock Parser_GetChar(ret[E_TOKEN])
 {
 	++ISI_gInputPtr,
-	ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NUM,
-	ret[E_TOKEN_NUM_VAL] = Parser_DoChar();
+	ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_INT,
+	ret[E_TOKEN_INT_VAL] = Parser_DoChar();
 	if (ISI_gInputLine[ISI_gInputPtr] != '\'') return Parser_Error("Unclosed character literal.");
 	return
 		++ISI_gInputPtr,
@@ -902,7 +911,7 @@ static stock Parser_GetLeft(prec)
 		pos = ISI_gParsePos;
 	if (pos >= sizeof (ISI_gParseTree)) return Parser_Error("Parse Tree full.");
 	Parser_GetNextToken(token);
-	switch (token[E_TOKEN_TYPE])
+	switch (token[E_TOKEN_TYPE] & TOKEN_TYPE_MASK)
 	{
 		case e_TOKEN_TYPE_OP:
 		{
@@ -984,7 +993,7 @@ static stock Parser_GetLeft(prec)
 				default: return Parser_Error("Expected value, found %s", Parser_PrintOp(token[E_TOKEN_OP]));
 			}
 		}
-		case TOKEN_ARRAY_CASES:
+		case e_TOKEN_TYPE_ARRAY,e_TOKEN_TYPE_FARRAY:
 		{
 			// Check for postfix operators.
 			new
@@ -1020,7 +1029,7 @@ static stock Parser_GetLeft(prec)
 						case e_TOKEN_OP_OP_BRACKET: return Parser_Error("Not a function.");
 						case e_TOKEN_OP_OP_SQUARE:
 						{
-							t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR,
+							t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_INDEX,
 							t2[E_TOKEN_LEFT] = pos,
 							t2[E_TOKEN_RIGHT] = Parser_GetLeft(prec),
 							ISI_gParseTree[(pos = ISI_gParsePos++)] = t2;
@@ -1051,14 +1060,14 @@ static stock Parser_GetLeft(prec)
 						{
 							if (once) return Parser_Error("Invalid syntax.");
 							once = true,
-							t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_APP,
+							t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_APPLY,
 							t2[E_TOKEN_LEFT] = pos,
 							t2[E_TOKEN_RIGHT] = Parser_GetLeft(prec),
 							ISI_gParseTree[(pos = ISI_gParsePos++)] = t2;
 						}
 						case e_TOKEN_OP_OP_SQUARE:
 						{
-							t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR,
+							t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_INDEX,
 							t2[E_TOKEN_LEFT] = pos,
 							t2[E_TOKEN_RIGHT] = Parser_GetLeft(prec),
 							ISI_gParseTree[(pos = ISI_gParsePos++)] = t2;
@@ -1069,7 +1078,7 @@ static stock Parser_GetLeft(prec)
 				else return pos;
 			}
 		}
-		case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_FVAR:
+		case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_FVAR, e_TOKEN_TYPE_LOCAL:
 		{
 			// Check for postfix operators.
 			new
@@ -1145,14 +1154,14 @@ static stock Parser_GetLeft(prec)
 						{
 							if (once) return Parser_Error("Invalid syntax.");
 							once = true,
-							t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_APP,
+							t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_APPLY,
 							t2[E_TOKEN_LEFT] = pos,
 							t2[E_TOKEN_RIGHT] = Parser_GetLeft(prec),
 							ISI_gParseTree[(pos = ISI_gParsePos++)] = t2;
 						}
 						case e_TOKEN_OP_OP_SQUARE:
 						{
-							t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARR,
+							t2[E_TOKEN_TYPE] = e_TOKEN_TYPE_INDEX,
 							t2[E_TOKEN_LEFT] = pos,
 							t2[E_TOKEN_RIGHT] = Parser_GetLeft(prec),
 							ISI_gParseTree[(pos = ISI_gParsePos++)] = t2;
@@ -1212,7 +1221,9 @@ stock Parser_SetInput(line[], size = sizeof (line))
 	return
 		ISI_gsStringEnd = 0,
 		ISI_gsStringTable = blank,
-		ISI_gInputLine[0] = '\0',
+		// Pad with one space, so we can store the first symbol correctly.
+		ISI_gInputLine[0] = ' ',
+		ISI_gInputLine[1] = '\0',
 		strcat(ISI_gInputLine, line),
 		ISI_gParsePos = 0,
 		ISI_gInputPtr = 0,
@@ -1247,7 +1258,7 @@ stock Parser_PrintExpr(str[], size, tree[][E_TOKEN], entry)
 
 static stock _Parser_PrintToken(str[], size, token[E_TOKEN], bool:bracket)
 {
-	switch (token[E_TOKEN_TYPE])
+	switch (token[E_TOKEN_TYPE] & TOKEN_TYPE_MASK)
 	{
 		case e_TOKEN_TYPE_STRING: format(str, size, "%s\"%s\"", str, ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
 		case e_TOKEN_TYPE_FLOAT:  format(str, size, "%s%.2f",   str, token[E_TOKEN_FLOAT_VAL]);
@@ -1259,15 +1270,19 @@ static stock _Parser_PrintToken(str[], size, token[E_TOKEN], bool:bracket)
 		}
 		case e_TOKEN_TYPE_FUNC, e_TOKEN_TYPE_FFUNC:
 			strcat(str, GetFunctionFromAddress(token[E_TOKEN_FUNC_PTR]), size);
-		case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_FVAR, TOKEN_ARRAY_CASES:
+		case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_FVAR, e_TOKEN_TYPE_ARRAY,e_TOKEN_TYPE_FARRAY:
 			strcat(str, GetVariableFromAddress(token[E_TOKEN_SYM_PTR]), size);
-		case e_TOKEN_TYPE_NUM:    format(str, size, "%s%d",     str, token[E_TOKEN_NUM_VAL]);
+#if defined INTROSPECT_PLAYER_DATA
+		case e_TOKEN_TYPE_LOCAL:
+			format(str, size, "%s%c", str, Parser_GetLocalName(token[E_TOKEN_SYM_PTR]));
+#endif
+		case e_TOKEN_TYPE_INT:    format(str, size, "%s%d",     str, token[E_TOKEN_INT_VAL]);
 		case e_TOKEN_TYPE_BOOL:   strcat(str, (token[E_TOKEN_BOOL_VAL]) ? ("true") : ("false"), size);
 		case e_TOKEN_TYPE_OP:
 			if (bracket) format(str, size, "%s(%s)", str, Parser_PrintOp(token[E_TOKEN_OP]));
 			else format(str, size, "%s%s", str, Parser_PrintOp(token[E_TOKEN_OP]));
-		case e_TOKEN_TYPE_APP:    strcat(str, "()", size);
-		case e_TOKEN_TYPE_ARR:    strcat(str, "[]", size);
+		case e_TOKEN_TYPE_APPLY:    strcat(str, "()", size);
+		case e_TOKEN_TYPE_INDEX:    strcat(str, "[]", size);
 		case e_TOKEN_TYPE_SYMBOL: format(str, size, "%s<<<%s>>>", str, ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
 		// case e_TOKEN_TYPE_MD:     strcat(str, "->", size);
 	}
@@ -1279,7 +1294,7 @@ static stock _Parser_PrintExpr(str[], size, tree[][E_TOKEN], entry)
 		bool:bracket = false;
 	switch (tree[entry][E_TOKEN_TYPE])
 	{
-		case e_TOKEN_TYPE_ARR:
+		case e_TOKEN_TYPE_INDEX:
 		{
 			_Parser_PrintExpr(str, size, tree, tree[entry][E_TOKEN_LEFT]);
 			strcat(str, "[", size);
@@ -1287,7 +1302,7 @@ static stock _Parser_PrintExpr(str[], size, tree[][E_TOKEN], entry)
 			strcat(str, "]", size);
 			return;
 		}
-		case e_TOKEN_TYPE_APP:
+		case e_TOKEN_TYPE_APPLY:
 		{
 			_Parser_PrintExpr(str, size, tree, tree[entry][E_TOKEN_LEFT]);
 			strcat(str, "(", size);
@@ -1324,11 +1339,11 @@ static stock _Parser_PrintTree(str[], size, tree[][E_TOKEN], entry, indent)
 #if defined INTROSPECT_PARSER_TEST
 
 // "P"arser "T"est "N"umber.
-#define PTN(%1) ISI_gInputLine=#%1,ISI_gInputPtr=0,Parser_GetNextToken(ret),printf("%s: \"%s\"",(ret[E_TOKEN_TYPE]==e_TOKEN_TYPE_NUM&&ret[E_TOKEN_NUM_VAL]==%1)?("PASS"):("FAIL"),ISI_gInputLine)
+#define PTN(%1) ISI_gInputLine=#%1,ISI_gInputPtr=0,Parser_GetNextToken(ret),printf("%s: \"%s\"",(ret[E_TOKEN_TYPE]==e_TOKEN_TYPE_INT&&ret[E_TOKEN_INT_VAL]==%1)?("PASS"):("FAIL"),ISI_gInputLine)
 // "P"arser "T"est "F"loat.
 #define PTF(%1) ISI_gInputLine=#%1,ISI_gInputPtr=0,Parser_GetNextToken(ret),printf("%s: \"%s\"",(ret[E_TOKEN_TYPE]==e_TOKEN_TYPE_FLOAT&&ret[E_TOKEN_FLOAT_VAL]==%1)?("PASS"):("FAIL"),ISI_gInputLine)
 // "P"arser "T"est "O"ctal (no native PAWN representation).
-#define PTO(%0,%1) ISI_gInputLine=#%0,ISI_gInputPtr=0,Parser_GetNextToken(ret),printf("%s: \"%s\"",(ret[E_TOKEN_TYPE]==e_TOKEN_TYPE_NUM&&ret[E_TOKEN_NUM_VAL]==%1)?("PASS"):("FAIL"),ISI_gInputLine)
+#define PTO(%0,%1) ISI_gInputLine=#%0,ISI_gInputPtr=0,Parser_GetNextToken(ret),printf("%s: \"%s\"",(ret[E_TOKEN_TYPE]==e_TOKEN_TYPE_INT&&ret[E_TOKEN_INT_VAL]==%1)?("PASS"):("FAIL"),ISI_gInputLine)
 
 #define TEST_OP(%1) ISI_gInputLine=#%1,ISI_gInputPtr=0,Parser_GetNextToken(ret),printf("%s: \"%s\"",(ret[E_TOKEN_TYPE]==e_TOKEN_TYPE_OP&&!strcmp(Parser_PrintOp(ret[E_TOKEN_OP]),#%1))?("PASS"):("FAIL"),ISI_gInputLine)
 
@@ -1413,8 +1428,12 @@ main()
 	TEST_OP("#");
 	TEST_OP("::");
 	
+#if defined INTROSPECT_PLAYER_DATA
+	ISI_gCurrentPlayer = 45;
+#endif
+	
 	//ISI_gInputLine = "34 0x55 7.7 \"Hello \\\"there\\\"\" 'a' MyFuncSymbol",
-	ISI_gInputLine = "-someVar + 5 * ((44) + 5) / func(a, b, c) * arr[5][6][xx[5]] - someVar++ - ++someVar - someVar-- - --someVar",
+	ISI_gInputLine = " -someVar + 5 * ((44) + 5) / func(a, b, c) * arr[5][6][xx[5]] - someVar++ - ++someVar - someVar-- - --someVar",
 	ISI_gInputPtr = 0,
 	ISI_gsStringEnd = strlen(ISI_gInputLine) + 1;
 	new
@@ -1442,29 +1461,30 @@ main()
 	
 	TEST_OP("\"");
 	TEST_OP("\'");
-	ISI_gInputLine = "70 5.5 0800 0100 0x345 0b11 0.888 0.888e3";
+	ISI_gInputPtr = 0,
+	ISI_gInputLine = " 70 5.5 0800 0100 0x345 0b11 0.888 0.888e3";
 	//new
 	//	ret[E_TOKEN];
-	printf("%d", e_TOKEN_TYPE_NUM);
+	printf("%d", e_TOKEN_TYPE_INT);
 	Parser_GetNextToken(ret);
-	printf("T = %d %d", ret[E_TOKEN_TYPE], ret[E_TOKEN_NUM_VAL]);
+	printf("T = %d %d", ret[E_TOKEN_TYPE], ret[E_TOKEN_INT_VAL]);
 	Parser_GetNextToken(ret);
 	printf("T = %d %.1f", ret[E_TOKEN_TYPE], ret[E_TOKEN_FLOAT_VAL]);
 	Parser_GetNextToken(ret);
-	printf("T = %d %04d", ret[E_TOKEN_TYPE], ret[E_TOKEN_NUM_VAL]);
+	printf("T = %d %04d", ret[E_TOKEN_TYPE], ret[E_TOKEN_INT_VAL]);
 	Parser_GetNextToken(ret);
-	printf("T = %d %04x", ret[E_TOKEN_TYPE], ret[E_TOKEN_NUM_VAL]);
+	printf("T = %d %04x", ret[E_TOKEN_TYPE], ret[E_TOKEN_INT_VAL]);
 	Parser_GetNextToken(ret);
-	printf("T = %d 0x%x", ret[E_TOKEN_TYPE], ret[E_TOKEN_NUM_VAL]);
+	printf("T = %d 0x%x", ret[E_TOKEN_TYPE], ret[E_TOKEN_INT_VAL]);
 	Parser_GetNextToken(ret);
-	printf("T = %d 0b%b", ret[E_TOKEN_TYPE], ret[E_TOKEN_NUM_VAL]);
+	printf("T = %d 0b%b", ret[E_TOKEN_TYPE], ret[E_TOKEN_INT_VAL]);
 	Parser_GetNextToken(ret);
 	printf("T = %d %f", ret[E_TOKEN_TYPE], ret[E_TOKEN_FLOAT_VAL]);
 	Parser_GetNextToken(ret);
 	printf("T = %d %f", ret[E_TOKEN_TYPE], ret[E_TOKEN_FLOAT_VAL]);
 	
 	
-	ISI_gInputLine = "Parser_FakeOne(Parser_FakeThree, Parser_FakeTwo(), 57)",
+	ISI_gInputLine = " Parser_FakeOne(Parser_FakeThree, Parser_FakeTwo(), 57)",
 	ISI_gInputPtr = 0,
 	ISI_gsStringEnd = strlen(ISI_gInputLine) + 1;
 	pos = Parser_BuildTree(cellmin);
@@ -1478,9 +1498,9 @@ main()
 	{
 		ISI_gsStringTable[i] = -1;
 	}
-	ISI_gInputLine = "f = g = h + 55",// = 55",
+	ISI_gInputLine = " f = g = h + 55",// = 55",
 	ISI_gInputPtr = 0,
-	ISI_gsStringEnd = strlen(ISI_gInputLine) + 1;
+	ISI_gsStringEnd = 0;
 	
 	pos = Parser_BuildTree(cellmin);
 	//print(Parser_PrintTree(ISI_gParseTree, pos));
