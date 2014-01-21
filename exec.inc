@@ -12,14 +12,24 @@ static stock const
 #define EXEC_INCOMPATIBLE print(_EXEC_INCOMPATIBLE)
 #define EXEC_NOT_LVALUE print(_EXEC_NOT_LVALUE)
 
-stock ExecLine(line[], size = sizeof (line))
+stock ExecLine(line[], size = sizeof (line), as = -1)
 {
+	new
+		ret[E_TOKEN] = EMPTY_PARSER_TOKEN;
 	if (Parser_SetInput(line, size))
 	{
+#if defined INTROSPECT_PLAYER_DATA
+		Parser_SetPlayer(as);
+#endif
 		new
 			parse = Parser_BuildTree();
-		
+		// new
+			// dest[512];
+		// Parser_PrintTree(dest, sizeof (dest), ISI_gParseTree, parse);
+		// print(dest);
+		Exec_Evaluate(ret, ISI_gParseTree, parse);
 	}
+	return ret;
 }
 
 static stock MI(const token[E_TOKEN])
@@ -247,6 +257,10 @@ static stock e_TOKEN_TYPE:Exec_ResolveInt(const l[E_TOKEN], const r[E_TOKEN], &l
 	{
 		case e_TOKEN_TYPE_OP       : switch (t[E_TOKEN_OP])
 		{
+			case e_TOKEN_OP_COMMA, e_TOKEN_OP_SEMICOLON:
+			{
+				ret = r;
+			}
 			case e_TOKEN_OP_ASSIGN: switch (l[E_TOKEN_TYPE])
 			{
 				case e_TOKEN_TYPE_LOCAL:
@@ -481,10 +495,7 @@ static stock e_TOKEN_TYPE:Exec_ResolveInt(const l[E_TOKEN], const r[E_TOKEN], &l
 					ret[E_TOKEN_FLOAT_VAL] = Float:rr;
 				default: EXEC_NOT_LVALUE;
 			}
-			default: TODO: Whatever OP this is...
-		}
-		case e_TOKEN_TYPE_APPLY      :
-		{
+			//default: TODO: Whatever OP this is...
 		}
 		case e_TOKEN_TYPE_INDEX      :
 		{
@@ -517,6 +528,125 @@ static stock e_TOKEN_TYPE:Exec_ResolveInt(const l[E_TOKEN], const r[E_TOKEN], &l
 	// new
 		// l[E_EXEC_RESULT]:
 		// r[E_EXEC_RESULT];
+}
+
+static stock Exec_PushOne(tree[][E_TOKEN], entry)
+{
+	new
+		token[E_TOKEN],
+		bool:pushed;
+	Exec_Evaluate(token, tree, entry);
+	switch (token[E_TOKEN_TYPE] & TOKEN_TYPE_MASK)
+	{
+		case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_LOCAL, e_TOKEN_TYPE_FVAR:
+		{
+			pushed = Push(Exec_LoadAddress(token[E_TOKEN_SYM_PTR]));
+		}
+		case e_TOKEN_TYPE_INT, e_TOKEN_TYPE_BOOL, e_TOKEN_TYPE_FLOAT:
+		{
+			pushed = Push(token[E_TOKEN_INT_VAL]);
+		}
+		case e_TOKEN_TYPE_STRING:
+		{
+			pushed = PushString(ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
+		}
+	}
+	if (!pushed) Parser_Error("Could not push parameters.");
+}
+
+static stock Exec_PushParams(tree[][E_TOKEN], entry)
+{
+	if (tree[entry][E_TOKEN_TYPE] == e_TOKEN_TYPE_NONE) return 0; // End.
+	else if (tree[entry][E_TOKEN_TYPE] != e_TOKEN_TYPE_OP ||tree[entry][E_TOKEN_OP] != e_TOKEN_OP_COMMA)
+	{
+		Exec_PushOne(tree, entry);
+		return
+			1;
+	}
+	Exec_PushOne(tree, tree[entry][E_TOKEN_LEFT]);
+	return Exec_PushParams(tree, tree[entry][E_TOKEN_RIGHT]) + 1;
+}
+
+static stock Exec_Evaluate(token[E_TOKEN], tree[][E_TOKEN], entry)
+{
+	new
+		l[E_TOKEN],
+		r[E_TOKEN];
+	//token = EMPTY_PARSER_TOKEN;
+	token = tree[0];
+	if (entry == -1) return;
+	token = tree[entry];
+	if (token[E_TOKEN_LEFT] == -1 && token[E_TOKEN_RIGHT] == -1) return;
+	Exec_Evaluate(l, tree, token[E_TOKEN_LEFT]);
+	switch (token[E_TOKEN_TYPE])
+	{
+		case e_TOKEN_TYPE_OP: if (token[E_TOKEN_OP] == e_TOKEN_OP_QUESTION)
+		{
+			// Ternary operator - requires special handling.
+			new
+				bool:tf;
+			r = tree[token[E_TOKEN_RIGHT]];
+			if (r[E_TOKEN_TYPE] != e_TOKEN_TYPE_OP || r[E_TOKEN_OP] != e_TOKEN_OP_COLON)
+			{
+				Parser_Error("Missing ':' after '?'.");
+				return;
+			}
+			switch (l[E_TOKEN_TYPE])
+			{
+				case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_LOCAL:
+					tf = bool:Exec_LoadAddress(l[E_TOKEN_SYM_PTR]);
+				case e_TOKEN_TYPE_INT:
+					tf = bool:l[E_TOKEN_INT_VAL];
+				case e_TOKEN_TYPE_BOOL:
+					tf = l[E_TOKEN_BOOL_VAL];
+				case e_TOKEN_TYPE_FLOAT:
+					tf = bool:token[E_TOKEN_FLOAT_VAL];
+				case e_TOKEN_TYPE_FVAR:
+					tf = bool:Float:Exec_LoadAddress(token[E_TOKEN_SYM_PTR]);
+				default:
+				{
+					Parser_Error("Could not evaluate condition.");
+					return;
+				}
+			}
+			// Only execute either the "true" or "false" branch (for side effects).
+			if (tf) Exec_Evaluate(token, tree, r[E_TOKEN_LEFT]);
+			else Exec_Evaluate(token, tree, r[E_TOKEN_RIGHT]);
+			return;
+		}
+		case e_TOKEN_TYPE_APPLY:
+		{
+			// Function call.
+			new
+				count = Exec_PushParams(tree, token[E_TOKEN_RIGHT]);
+			// printf("Calling with %d params", count);
+			switch (l[E_TOKEN_TYPE])
+			{
+				case e_TOKEN_TYPE_NATIVE:
+				{
+					// printf("Index: %d", l[E_TOKEN_NATIVE_ADDR]);
+					token[E_TOKEN_TYPE] = e_TOKEN_TYPE_INT,
+					token[E_TOKEN_INT_VAL] = SysreqDN(l[E_TOKEN_NATIVE_ADDR], count);
+				}
+				case e_TOKEN_TYPE_FUNC:
+				{
+					token[E_TOKEN_TYPE] = e_TOKEN_TYPE_INT,
+					token[E_TOKEN_INT_VAL] = CallN(l[E_TOKEN_FUNC_PTR], count);
+				}
+				case e_TOKEN_TYPE_FFUNC:
+				{
+					token[E_TOKEN_TYPE] = e_TOKEN_TYPE_FLOAT,
+					token[E_TOKEN_FLOAT_VAL] = Float:CallN(l[E_TOKEN_FUNC_PTR], count);
+				}
+				default: Parser_Error("Not a pointer.");
+			}
+			// printf("Called");
+			return;
+		}
+	}
+	// Default action.
+	Exec_Evaluate(r, tree, token[E_TOKEN_RIGHT]);
+	token = Exec_ExecToken(token, l, r);
 }
 
 #undef EXEC_OP

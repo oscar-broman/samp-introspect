@@ -122,7 +122,7 @@ enum E_TOKEN
 	e_TOKEN_OP:E_TOKEN_OP = 1,
 	E_TOKEN_SYM_PTR = 1,
 	E_TOKEN_STRING_IDX = 1,
-	E_TOKEN_NATIVE_IDX = 1,
+	E_TOKEN_NATIVE_ADDR = 1,
 	E_TOKEN_FUNC_PTR = 1,
 	E_TOKEN_LEFT,
 	E_TOKEN_RIGHT,
@@ -214,18 +214,25 @@ static stock const
 
 static stock
 	ISI_gFloatTagIndex = -1,
-	ISI_gInputLine[512],
-	ISI_gInputLen,
 	ISI_gInputPtr,
 	ISI_gParsePos,
-	ISI_gParseTree[512][E_TOKEN],
-	ISI_gsStringEnd,
-	ISI_gsStringTable[32] = {-1, ...};
+	ISI_gsStringEnd;
+
+stock
+	ISI_gInputLine[512],
+	ISI_gsStringTable[32] = {-1, ...},
+	ISI_gParseTree[512][E_TOKEN];
 
 #if defined INTROSPECT_PLAYER_DATA
 	static stock
 		ISI_gCurrentPlayer,
 		ISI_gPlayerLocals[MAX_PLAYERS][26];
+	
+	stock Parser_SetPlayer(pid)
+	{
+		ISI_gCurrentPlayer = pid;
+		TODO: States for errors.
+	}
 	
 	static stock Parser_GetLocalName(ptr)
 	{
@@ -282,7 +289,7 @@ static stock Parser_Print(token[E_TOKEN], ret[], len = sizeof (ret))
 		case e_TOKEN_TYPE_NATIVE:
 		{
 			new name[32];
-			GetNativeNameFromIndex(token[E_TOKEN_NATIVE_IDX], name);
+			GetNativeNameFromAddress(token[E_TOKEN_NATIVE_ADDR], name);
 			format(ret, len, "NATIVE:   %s", name);
 		}
 		case e_TOKEN_TYPE_SYMBOL:
@@ -431,11 +438,11 @@ static stock Parser_GetOp(ret[E_TOKEN])
 	PARSER_DO_OP_1(e_TOKEN_OP_HASH, '#')
 	PARSER_DO_OP_1(e_TOKEN_OP_DQUOTE, '"')
 	PARSER_DO_OP_1(e_TOKEN_OP_QUOTE, '\'')
-	PARSER_DO_OP_1(e_TOKEN_OP_SEMICOLON, ';')
 	PARSER_DO_OP_1(e_TOKEN_OP_COMMA, ',')
 	PARSER_DO_OP_1(e_TOKEN_OP_POINT, '.')
-	PARSER_DO_OP_1(e_TOKEN_OP_COLON, ':')
 	PARSER_DO_OP_1(e_TOKEN_OP_QUESTION, '?')
+	PARSER_DO_OP_1(e_TOKEN_OP_COLON, ':')
+	PARSER_DO_OP_1(e_TOKEN_OP_SEMICOLON, ';')
 	if (len)
 	{
 		// Found an op.
@@ -802,17 +809,18 @@ static stock Parser_GetSymbol(ret[E_TOKEN])
 		{
 			// See if this symbol is a native function.
 			new
-				info = GetNativeIndexFromName(ISI_gInputLine[ISI_gInputPtr]);
+				info = GetNativeAddressFromName(ISI_gInputLine[ISI_gInputPtr]);
 			if (info != -1)
 			{
 				ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NATIVE,
-				ret[E_TOKEN_NATIVE_IDX] = info;
+				ret[E_TOKEN_NATIVE_ADDR] = info;
 				goto Parser_GetSymbol_return;
 			}
 		}
 #endif
 #if defined INTROSPECT_PLAYER_DATA
 		{
+			TODO: Turn on IsPlayerConnected check.
 			if (ptr - ISI_gInputPtr == 1 && 'a' <= ISI_gInputLine[ISI_gInputPtr] <= 'z') // && IsPlayerConnected(ISI_gCurrentPlayer))
 			{
 				ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_LOCAL,
@@ -926,7 +934,7 @@ static stock Parser_GetLeft(prec)
 					{
 						return
 							Parser_GetNextToken(t2),
-							-1;
+							0;
 					}
 					// Start of a new bracketed set.
 					pos = Parser_BuildTree(0);
@@ -993,7 +1001,7 @@ static stock Parser_GetLeft(prec)
 				default: return Parser_Error("Expected value, found %s", Parser_PrintOp(token[E_TOKEN_OP]));
 			}
 		}
-		case e_TOKEN_TYPE_ARRAY,e_TOKEN_TYPE_FARRAY:
+		case e_TOKEN_TYPE_ARRAY, e_TOKEN_TYPE_FARRAY:
 		{
 			// Check for postfix operators.
 			new
@@ -1188,6 +1196,7 @@ stock Parser_BuildTree(prec = cellmin)
 	for ( ; ; )
 	{
 		new
+			// bool:comma = false,
 			p2 = prec;
 		token = Parser_PeekToken();
 		//PrettyPrint(left);
@@ -1199,13 +1208,28 @@ stock Parser_BuildTree(prec = cellmin)
 				//printf("Cur prec = %d", prec);
 				//printf("%s", Parser_PrintOp(token[E_TOKEN_OP]));
 				if ((p2 = ISI_gscOpData[token[E_TOKEN_OP]][E_OPERATOR_DATA_PRECEDENCE]) <= prec) return left;
+				// switch (token[E_TOKEN_OP])
+				// {
+					// case e_TOKEN_OP_SEMICOLON, e_TOKEN_OP_COMMA: comma = true;
+				// }
 			}
 			default: return Parser_Error("Unexpected token, expected operator.");
 		}
 		new
 			ret = ISI_gParsePos++;
-		Parser_GetNextToken(token), // We only peeked, so pop.
-		token[E_TOKEN_LEFT] = left,
+		Parser_GetNextToken(token); // We only peeked, so pop.
+		// SPECIAL CASE FOR COMMAS.
+		// if (comma && (ISI_gParseTree[left][E_TOKEN_TYPE] != e_TOKEN_TYPE_OP || 
+			// (ISI_gParseTree[left][E_TOKEN_OP] != e_TOKEN_OP_SEMICOLON && ISI_gParseTree[left][E_TOKEN_OP] != e_TOKEN_OP_COMMA)))
+		// {
+			// ISI_gParseTree[ISI_gParsePos][E_TOKEN_LEFT] = 0,
+			// ISI_gParseTree[ISI_gParsePos][E_TOKEN_RIGHT] = left,
+			// ISI_gParseTree[ISI_gParsePos][E_TOKEN_TYPE] = e_TOKEN_TYPE_OP,
+			// ISI_gParseTree[ISI_gParsePos][E_TOKEN_OP] = token[E_TOKEN_OP],
+			// token[E_TOKEN_LEFT] = ISI_gParsePos++;
+		// }
+		// else
+		token[E_TOKEN_LEFT] = left;
 		token[E_TOKEN_RIGHT] = Parser_BuildTree((p2 == 4) ? (p2 - 1) : p2),
 		ISI_gParseTree[ret] = token,
 		left = ret;
@@ -1216,17 +1240,19 @@ stock Parser_BuildTree(prec = cellmin)
 stock Parser_SetInput(line[], size = sizeof (line))
 {
 	if (size > sizeof (ISI_gInputLine)) return Parser_Error("Insufficient line space.");
-	new
-		blank[sizeof (ISI_gsStringTable)] = {-1, ...};
+	static
+		blank[sizeof (ISI_gsStringTable)] = {-1, ...},
+		sNoToken[E_TOKEN] = EMPTY_PARSER_TOKEN;
 	return
+		ISI_gParseTree[0] = sNoToken, // Static "none" token.
 		ISI_gsStringEnd = 0,
 		ISI_gsStringTable = blank,
 		// Pad with one space, so we can store the first symbol correctly.
 		ISI_gInputLine[0] = ' ',
 		ISI_gInputLine[1] = '\0',
 		strcat(ISI_gInputLine, line),
-		ISI_gParsePos = 0,
-		ISI_gInputPtr = 0,
+		ISI_gParsePos = 1,
+		ISI_gInputPtr = 1,
 		1;
 }
 
@@ -1256,6 +1282,12 @@ stock Parser_PrintExpr(str[], size, tree[][E_TOKEN], entry)
 	_Parser_PrintExpr(str, size, tree, entry);
 }
 
+stock RenderToken(str[], token[E_TOKEN], size = sizeof (str))
+{
+	str[0] = '\0',
+	_Parser_PrintToken(str, size, token, false);
+}
+
 static stock _Parser_PrintToken(str[], size, token[E_TOKEN], bool:bracket)
 {
 	switch (token[E_TOKEN_TYPE] & TOKEN_TYPE_MASK)
@@ -1265,7 +1297,7 @@ static stock _Parser_PrintToken(str[], size, token[E_TOKEN], bool:bracket)
 		case e_TOKEN_TYPE_NATIVE:
 		{
 			new name[32];
-			GetNativeNameFromIndex(token[E_TOKEN_NATIVE_IDX], name);
+			GetNativeNameFromIndex(token[E_TOKEN_NATIVE_ADDR], name);
 			strcat(str, name, size);
 		}
 		case e_TOKEN_TYPE_FUNC, e_TOKEN_TYPE_FFUNC:
@@ -1433,9 +1465,7 @@ main()
 #endif
 	
 	//ISI_gInputLine = "34 0x55 7.7 \"Hello \\\"there\\\"\" 'a' MyFuncSymbol",
-	ISI_gInputLine = " -someVar + 5 * ((44) + 5) / func(a, b, c) * arr[5][6][xx[5]] - someVar++ - ++someVar - someVar-- - --someVar",
-	ISI_gInputPtr = 0,
-	ISI_gsStringEnd = strlen(ISI_gInputLine) + 1;
+	Parser_SetInput(" -someVar + 5 * ((44) + 5) / func(a, b, c) * arr[5][6][xx[5]] - someVar++ - ++someVar - someVar-- - --someVar");
 	new
 		pos = Parser_BuildTree(cellmin),
 		str[32],
@@ -1461,8 +1491,7 @@ main()
 	
 	TEST_OP("\"");
 	TEST_OP("\'");
-	ISI_gInputPtr = 0,
-	ISI_gInputLine = " 70 5.5 0800 0100 0x345 0b11 0.888 0.888e3";
+	Parser_SetInput(" 70 5.5 0800 0100 0x345 0b11 0.888 0.888e3");
 	//new
 	//	ret[E_TOKEN];
 	printf("%d", e_TOKEN_TYPE_INT);
@@ -1483,25 +1512,20 @@ main()
 	Parser_GetNextToken(ret);
 	printf("T = %d %f", ret[E_TOKEN_TYPE], ret[E_TOKEN_FLOAT_VAL]);
 	
-	
-	ISI_gInputLine = " Parser_FakeOne(Parser_FakeThree, Parser_FakeTwo(), 57)",
-	ISI_gInputPtr = 0,
-	ISI_gsStringEnd = strlen(ISI_gInputLine) + 1;
+	// BUG: Using "(a, b)" as the FIRST parameter doesn't work.  Others do.
+	Parser_SetInput("Parser_FakeOne((Parser_FakeThree, 77), Parser_FakeTwo(), (7, 57))");
 	pos = Parser_BuildTree(cellmin);
 	//print(Parser_PrintTree(ISI_gParseTree, pos));
 	Parser_PrintTree(output, sizeof (output), ISI_gParseTree, pos);
 	print(output);
-	Parser_FakeOne();
-	Parser_FakeTwo();
 	
-	for (new i = 0 ; i != sizeof (ISI_gsStringTable); ++i)
-	{
-		ISI_gsStringTable[i] = -1;
-	}
-	ISI_gInputLine = " f = g = h + 55",// = 55",
-	ISI_gInputPtr = 0,
-	ISI_gsStringEnd = 0;
+	Parser_SetInput("f = g = h + 55");
+	pos = Parser_BuildTree(cellmin);
+	//print(Parser_PrintTree(ISI_gParseTree, pos));
+	Parser_PrintTree(output, sizeof (output), ISI_gParseTree, pos);
+	print(output);
 	
+	Parser_SetInput("Parser_FakeTwo(one)");
 	pos = Parser_BuildTree(cellmin);
 	//print(Parser_PrintTree(ISI_gParseTree, pos));
 	Parser_PrintTree(output, sizeof (output), ISI_gParseTree, pos);
@@ -1510,6 +1534,7 @@ main()
 	Parser_FakeTwo();
 }
 
+// Variables we later get the address of.
 stock Parser_FakeThree;
 
 stock Parser_FakeTwo()
