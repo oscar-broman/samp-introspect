@@ -542,7 +542,7 @@ static stock Exec_PushOne(tree[][E_TOKEN], entry)
 		{
 			pushed = Push(Exec_LoadAddress(token[E_TOKEN_SYM_PTR]));
 		}
-		case e_TOKEN_TYPE_INT, e_TOKEN_TYPE_BOOL, e_TOKEN_TYPE_FLOAT:
+		case e_TOKEN_TYPE_INT, e_TOKEN_TYPE_BOOL, e_TOKEN_TYPE_FLOAT, e_TOKEN_TYPE_ARRAY, e_TOKEN_TYPE_FARRAY:
 		{
 			pushed = Push(token[E_TOKEN_INT_VAL]);
 		}
