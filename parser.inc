@@ -151,6 +151,7 @@ enum E_OPERATOR_DATA
 static stock const
 	ISI_gscOpData[][E_OPERATOR_DATA] =
 		{
+			// 3 is a special precedence that makes "=" right-associative.
 			{"<none>", 0}, // e_TOKEN_OP_NONE
 			{"=", 4}, // e_TOKEN_OP_ASSIGN
 			{"==", 12}, // e_TOKEN_OP_EQUALS
@@ -306,12 +307,7 @@ static stock Parser_PeekChar()
 	return ISI_gInputLine[ISI_gInputPtr];
 }
 
-static stock Parser_Pop(consume)
-{
-	return ISI_gInputPtr = consume;
-}
-
-static stock Parser_PeekToken(&consume)
+static stock Parser_PeekToken()
 {
 	// Find out what the next token is, then backtrack to the start of it.
 	new
@@ -333,7 +329,6 @@ static stock Parser_PeekToken(&consume)
 		default: Parser_GetOp(ret);
 	}
 	return
-		consume = ISI_gInputPtr,
 		ISI_gInputPtr = ptr,
 		ret;
 }
@@ -456,6 +451,7 @@ static stock Parser_GetNextToken(ret[E_TOKEN])
 		case '0' .. '9': Parser_GetNumber(ret);
 		case 'a' .. 'z', 'A' .. 'Z', '_', '@':
 		{
+			// printf("%s", ISI_gInputLine[ISI_gInputPtr]);
 			Parser_GetSymbol(ret);
 			// Resolve the symbol
 			if (ret[E_TOKEN_TYPE] == e_TOKEN_TYPE_SYMBOL)
@@ -814,28 +810,17 @@ static stock Parser_GetSymbol(ret[E_TOKEN])
 	ISI_gInputLine[ptr] = '\0';
 	// Booleans.
 	if (!strcmp(ISI_gInputLine[ISI_gInputPtr], "false"))
-	{
-		return
-			ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_BOOL,
-			ret[E_TOKEN_BOOL_VAL] = false,
-			ISI_gInputLine[(ISI_gInputPtr = ptr)] = tmp,
-			1;
-	}
+		ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_BOOL,
+		ret[E_TOKEN_BOOL_VAL] = false;
 	else if (!strcmp(ISI_gInputLine[ISI_gInputPtr], "true"))
-	{
-		return
-			ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_BOOL,
-			ret[E_TOKEN_BOOL_VAL] = true,
-			ISI_gInputLine[(ISI_gInputPtr = ptr)] = tmp,
-			1;
-	}
-	return
+		ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_BOOL,
+		ret[E_TOKEN_BOOL_VAL] = true;
+	else
 		ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_SYMBOL,
-		ret[E_TOKEN_STRING_IDX] = Parser_AddString(ISI_gInputPtr),
-		//ret[_E_TOKEN_TEMP_STRING][0] = '\0',
-		//strcat(ret[_E_TOKEN_TEMP_STRING], ISI_gInputLine[ISI_gInputPtr], 32),
-		//strcpy(ret[_E_TOKEN_TEMP_STRING], ISI_gInputLine[ISI_gInputPtr], 32),
-		ISI_gInputLine[(ISI_gInputPtr = ptr)] = tmp,
+		ret[E_TOKEN_STRING_IDX] = Parser_AddString(ISI_gInputPtr);
+	return
+		ISI_gInputLine[ptr] = tmp,
+		ISI_gInputPtr = ptr,
 		1;
 }
 
@@ -926,13 +911,12 @@ static stock Parser_GetLeft(prec)
 				case e_TOKEN_OP_OP_BRACKET:
 				{
 					new
-						consume,
 						t2[E_TOKEN];
-					t2 = Parser_PeekToken(consume);
+					t2 = Parser_PeekToken();
 					if (t2[E_TOKEN_TYPE] == e_TOKEN_TYPE_OP && t2[E_TOKEN_OP] == e_TOKEN_OP_CL_BRACKET)
 					{
 						return
-							Parser_Pop(consume),
+							Parser_GetNextToken(t2),
 							-1;
 					}
 					// Start of a new bracketed set.
@@ -1004,12 +988,11 @@ static stock Parser_GetLeft(prec)
 		{
 			// Check for postfix operators.
 			new
-				consume,
 				t2[E_TOKEN];
 			ISI_gParseTree[ISI_gParsePos++] = token;
 			for ( ; ; )
 			{
-				t2 = Parser_PeekToken(consume);
+				t2 = Parser_PeekToken();
 				if (t2[E_TOKEN_TYPE] == e_TOKEN_TYPE_OP)
 				{
 					switch (t2[E_TOKEN_OP])
@@ -1021,7 +1004,7 @@ static stock Parser_GetLeft(prec)
 								t2[E_TOKEN_LEFT] = pos,
 								t2[E_TOKEN_RIGHT] = -1,
 								ISI_gParseTree[(pos = ISI_gParsePos++)] = t2,
-								Parser_Pop(consume),
+								Parser_GetNextToken(t2),
 								pos;
 						}
 						case e_TOKEN_OP_PRE_DEC:
@@ -1031,7 +1014,7 @@ static stock Parser_GetLeft(prec)
 								t2[E_TOKEN_LEFT] = pos,
 								t2[E_TOKEN_RIGHT] = -1,
 								ISI_gParseTree[(pos = ISI_gParsePos++)] = t2,
-								Parser_Pop(consume),
+								Parser_GetNextToken(t2),
 								pos;
 						}
 						case e_TOKEN_OP_OP_BRACKET: return Parser_Error("Not a function.");
@@ -1053,12 +1036,11 @@ static stock Parser_GetLeft(prec)
 			// Check for postfix operators.
 			new
 				bool:once = false,
-				consume,
 				t2[E_TOKEN];
 			ISI_gParseTree[ISI_gParsePos++] = token;
 			for ( ; ; )
 			{
-				t2 = Parser_PeekToken(consume);
+				t2 = Parser_PeekToken();
 				if (t2[E_TOKEN_TYPE] == e_TOKEN_TYPE_OP)
 				{
 					switch (t2[E_TOKEN_OP])
@@ -1091,10 +1073,9 @@ static stock Parser_GetLeft(prec)
 		{
 			// Check for postfix operators.
 			new
-				consume,
 				t2[E_TOKEN];
 			ISI_gParseTree[ISI_gParsePos++] = token;
-			t2 = Parser_PeekToken(consume);
+			t2 = Parser_PeekToken();
 			if (t2[E_TOKEN_TYPE] == e_TOKEN_TYPE_OP)
 			{
 				switch (t2[E_TOKEN_OP])
@@ -1106,7 +1087,7 @@ static stock Parser_GetLeft(prec)
 							t2[E_TOKEN_LEFT] = pos,
 							t2[E_TOKEN_RIGHT] = -1,
 							ISI_gParseTree[(pos = ISI_gParsePos++)] = t2,
-							Parser_Pop(consume),
+							Parser_GetNextToken(t2),
 							pos;
 					}
 					case e_TOKEN_OP_PRE_DEC:
@@ -1116,7 +1097,7 @@ static stock Parser_GetLeft(prec)
 							t2[E_TOKEN_LEFT] = pos,
 							t2[E_TOKEN_RIGHT] = -1,
 							ISI_gParseTree[(pos = ISI_gParsePos++)] = t2,
-							Parser_Pop(consume),
+							Parser_GetNextToken(t2),
 							pos;
 					}
 					case e_TOKEN_OP_OP_BRACKET: return Parser_Error("Not a function.");
@@ -1131,12 +1112,11 @@ static stock Parser_GetLeft(prec)
 			// Check for postfix operators.
 			new
 				bool:once = false,
-				consume,
 				t2[E_TOKEN];
 			ISI_gParseTree[ISI_gParsePos++] = token;
 			for ( ; ; )
 			{
-				t2 = Parser_PeekToken(consume);
+				t2 = Parser_PeekToken();
 				if (t2[E_TOKEN_TYPE] == e_TOKEN_TYPE_OP)
 				{
 					switch (t2[E_TOKEN_OP])
@@ -1148,7 +1128,7 @@ static stock Parser_GetLeft(prec)
 								t2[E_TOKEN_LEFT] = pos,
 								t2[E_TOKEN_RIGHT] = -1,
 								ISI_gParseTree[(pos = ISI_gParsePos++)] = t2,
-								Parser_Pop(consume),
+								Parser_GetNextToken(t2),
 								pos;
 						}
 						case e_TOKEN_OP_PRE_DEC:
@@ -1158,7 +1138,7 @@ static stock Parser_GetLeft(prec)
 								t2[E_TOKEN_LEFT] = pos,
 								t2[E_TOKEN_RIGHT] = -1,
 								ISI_gParseTree[(pos = ISI_gParsePos++)] = t2,
-								Parser_Pop(consume),
+								Parser_GetNextToken(t2),
 								pos;
 						}
 						case e_TOKEN_OP_OP_BRACKET:
@@ -1199,26 +1179,25 @@ stock Parser_BuildTree(prec = cellmin)
 	for ( ; ; )
 	{
 		new
-			consume,
 			p2 = prec;
-		token = Parser_PeekToken(consume);
-		//PrettyPrint(token);
+		token = Parser_PeekToken();
+		//PrettyPrint(left);
 		switch (token[E_TOKEN_TYPE])
 		{
 			case e_TOKEN_TYPE_NONE: break; // Done.
 			case e_TOKEN_TYPE_OP:
 			{
 				//printf("Cur prec = %d", prec);
+				//printf("%s", Parser_PrintOp(token[E_TOKEN_OP]));
 				if ((p2 = ISI_gscOpData[token[E_TOKEN_OP]][E_OPERATOR_DATA_PRECEDENCE]) <= prec) return left;
 			}
 			default: return Parser_Error("Unexpected token, expected operator.");
 		}
 		new
 			ret = ISI_gParsePos++;
-		//Parser_GetNextToken(token), // We only peeked, so pop.
-		Parser_Pop(consume),
+		Parser_GetNextToken(token), // We only peeked, so pop.
 		token[E_TOKEN_LEFT] = left,
-		token[E_TOKEN_RIGHT] = Parser_BuildTree(p2),
+		token[E_TOKEN_RIGHT] = Parser_BuildTree((p2 == 4) ? (p2 - 1) : p2),
 		ISI_gParseTree[ret] = token,
 		left = ret;
 	}
@@ -1355,7 +1334,7 @@ static stock _Parser_PrintTree(str[], size, tree[][E_TOKEN], entry, indent)
 
 main()
 {
-	// IntrospectInit();
+	IntrospectInit();
 	print("\n-------------------------");
 	print(" Introspect parser tests");
 	print("-------------------------\n");
@@ -1436,7 +1415,8 @@ main()
 	
 	//ISI_gInputLine = "34 0x55 7.7 \"Hello \\\"there\\\"\" 'a' MyFuncSymbol",
 	ISI_gInputLine = "-someVar + 5 * ((44) + 5) / func(a, b, c) * arr[5][6][xx[5]] - someVar++ - ++someVar - someVar-- - --someVar",
-	ISI_gInputPtr = 0;
+	ISI_gInputPtr = 0,
+	ISI_gsStringEnd = strlen(ISI_gInputLine) + 1;
 	new
 		pos = Parser_BuildTree(cellmin),
 		str[32],
@@ -1484,8 +1464,24 @@ main()
 	printf("T = %d %f", ret[E_TOKEN_TYPE], ret[E_TOKEN_FLOAT_VAL]);
 	
 	
-	ISI_gInputLine = "Parser_FakeOne(Parser_FakeThree, Parser_FakeTwo())",
-	ISI_gInputPtr = 0;
+	ISI_gInputLine = "Parser_FakeOne(Parser_FakeThree, Parser_FakeTwo(), 57)",
+	ISI_gInputPtr = 0,
+	ISI_gsStringEnd = strlen(ISI_gInputLine) + 1;
+	pos = Parser_BuildTree(cellmin);
+	//print(Parser_PrintTree(ISI_gParseTree, pos));
+	Parser_PrintTree(output, sizeof (output), ISI_gParseTree, pos);
+	print(output);
+	Parser_FakeOne();
+	Parser_FakeTwo();
+	
+	for (new i = 0 ; i != sizeof (ISI_gsStringTable); ++i)
+	{
+		ISI_gsStringTable[i] = -1;
+	}
+	ISI_gInputLine = "f = g = h + 55",// = 55",
+	ISI_gInputPtr = 0,
+	ISI_gsStringEnd = strlen(ISI_gInputLine) + 1;
+	
 	pos = Parser_BuildTree(cellmin);
 	//print(Parser_PrintTree(ISI_gParseTree, pos));
 	Parser_PrintTree(output, sizeof (output), ISI_gParseTree, pos);
@@ -1494,13 +1490,13 @@ main()
 	Parser_FakeTwo();
 }
 
-static stock Parser_FakeThree;
+stock Parser_FakeThree;
 
-static stock Parser_FakeTwo()
+stock Parser_FakeTwo()
 {
 }
 
-static stock Parser_FakeOne()
+stock Parser_FakeOne()
 {
 	printf("%d", Parser_FakeThree);
 }
