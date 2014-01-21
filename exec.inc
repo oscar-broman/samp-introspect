@@ -495,6 +495,53 @@ static stock e_TOKEN_TYPE:Exec_ResolveInt(const l[E_TOKEN], const r[E_TOKEN], &l
 					ret[E_TOKEN_FLOAT_VAL] = Float:rr;
 				default: EXEC_NOT_LVALUE;
 			}
+			case e_TOKEN_OP_CONCAT:
+			{
+				if (l[E_TOKEN_TYPE] != e_TOKEN_TYPE_STRING || r[E_TOKEN_TYPE] != e_TOKEN_TYPE_STRING)
+					return Parser_Error("Can only concat strings."), ret;
+				new
+					str[512];
+				ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_STRING,
+				lr = l[E_TOKEN_STRING_IDX],
+				rr = r[E_TOKEN_STRING_IDX],
+				strcat(str, ISI_gInputLine[ISI_gsStringTable[lr]]),
+				strcat(str, ISI_gInputLine[ISI_gsStringTable[rr]]),
+				Parser_RemoveString(lr),
+				Parser_RemoveString(rr),
+				ret[E_TOKEN_STRING_IDX] = Parser_InsertString(str);
+			}
+			case e_TOKEN_OP_HASH:
+			{
+				new
+					str[512];
+				switch (r[E_TOKEN_TYPE])
+				{
+					case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_LOCAL:
+					{
+						valstr(str, Exec_LoadAddress(r[E_TOKEN_SYM_PTR]));
+					}
+					case e_TOKEN_TYPE_INT:
+					{
+						valstr(str, r[E_TOKEN_INT_VAL]);
+					}
+					case e_TOKEN_TYPE_BOOL:
+					{
+						str = r[E_TOKEN_BOOL_VAL] ? ("true") : ("false");
+					}
+					case e_TOKEN_TYPE_FLOAT:
+					{
+						format(str, sizeof (str), "%.2f", r[E_TOKEN_FLOAT_VAL]);
+					}
+					case e_TOKEN_TYPE_FVAR:
+					{
+						format(str, sizeof (str), "%.2f", Float:Exec_LoadAddress(r[E_TOKEN_SYM_PTR]));
+					}
+					case e_TOKEN_TYPE_STRING: return r;
+					default: return Parser_Error("Cannot convert token to string."), ret;
+				}
+				ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_STRING,
+				ret[E_TOKEN_STRING_IDX] = Parser_InsertString(str);
+			}
 			//default: TODO: Whatever OP this is...
 		}
 		case e_TOKEN_TYPE_INDEX      :
@@ -542,7 +589,11 @@ static stock Exec_PushOne(tree[][E_TOKEN], entry)
 		{
 			pushed = Push(Exec_LoadAddress(token[E_TOKEN_SYM_PTR]));
 		}
-		case e_TOKEN_TYPE_INT, e_TOKEN_TYPE_BOOL, e_TOKEN_TYPE_FLOAT, e_TOKEN_TYPE_ARRAY, e_TOKEN_TYPE_FARRAY:
+		case e_TOKEN_TYPE_INT,
+		     e_TOKEN_TYPE_BOOL,
+		     e_TOKEN_TYPE_FLOAT,
+		     e_TOKEN_TYPE_ARRAY,
+		     e_TOKEN_TYPE_FARRAY:
 		{
 			pushed = Push(token[E_TOKEN_INT_VAL]);
 		}

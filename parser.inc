@@ -1560,7 +1560,7 @@ stock Parser_FakeOne()
 |******************************************************************************|
 \******************************************************************************/
 
-static stock Parser_AddString(start)
+stock Parser_AddString(start)
 {
 	new
 		i = 0;
@@ -1574,7 +1574,7 @@ static stock Parser_AddString(start)
 	return i;
 }
 
-static stock Parser_ReserveString()
+stock Parser_ReserveString()
 {
 	new
 		i = 0;
@@ -1587,7 +1587,7 @@ static stock Parser_ReserveString()
 	return i;
 }
 
-static stock Parser_RemoveString(idx)
+stock Parser_RemoveString(idx)
 {
 	if (idx == -1) return;
 	new
@@ -1616,7 +1616,7 @@ static stock Parser_RemoveString(idx)
 	ISI_gsStringTable[idx] = -1;
 }
 
-static stock Parser_InsertString(str[])
+stock Parser_InsertString(str[])
 {
 	new
 		i = 0;
