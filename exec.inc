@@ -18,7 +18,7 @@ static stock const
 	#define EXEC_NOT_LVALUE   print(_EXEC_NOT_LVALUE)
 #endif
 
-stock ExecLine(line[], size = sizeof (line), as = -1)
+stock RunExpression(line[], size = sizeof (line), as = -1)
 {
 	new
 		ret[E_TOKEN] = EMPTY_PARSER_TOKEN;
