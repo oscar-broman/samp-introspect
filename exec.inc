@@ -29,12 +29,7 @@ stock ExecLine(line[], size = sizeof (line), as = -1)
 	{
 		new
 			parse = Parser_BuildTree();
-		new
-			dest[512];
-		Parser_PrintTree(dest, sizeof (dest), ISI_gParseTree, parse);
-		print(dest);
 		Exec_Evaluate(ret, ISI_gParseTree, parse);
-		// printf("2");
 	}
 #if defined INTROSPECT_PLAYER_DATA
 	Parser_SetPlayer(-1);
@@ -228,7 +223,7 @@ static stock e_TOKEN_TYPE:Exec_ResolveInt(const l[E_TOKEN], const r[E_TOKEN], &l
 	if(ttt==e_TOKEN_TYPE_NONE) EXEC_INCOMPATIBLE; \
 	else ret[E_TOKEN_TYPE]=ttt,ret[E_TOKEN_INT_VAL]=lr%9rr; }
 
-/*static*/ stock Exec_ExecToken(const t[E_TOKEN], const l[E_TOKEN], const r[E_TOKEN])
+static stock Exec_ExecToken(const t[E_TOKEN], const l[E_TOKEN], const r[E_TOKEN])
 {
 	static lr, rr;
 	static const
@@ -549,17 +544,11 @@ static stock Exec_PushOne(tree[][E_TOKEN], entry)
 	new
 		token[E_TOKEN],
 		bool:pushed;
-	printf("eval:");
-	new
-		dest[512];
-	Parser_PrintTree(dest, sizeof (dest), ISI_gParseTree, entry);
-	print(dest);
 	Exec_Evaluate(token, tree, entry);
 	switch (token[E_TOKEN_TYPE] & TOKEN_TYPE_MASK)
 	{
 		case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_FVAR:
 		{
-			printf("pushing %d", token[E_TOKEN_INT_VAL]);
 			pushed = Push(ReadAmxMemory(token[E_TOKEN_SYM_PTR]));
 		}
 		case e_TOKEN_TYPE_INT,
@@ -568,12 +557,10 @@ static stock Exec_PushOne(tree[][E_TOKEN], entry)
 		     e_TOKEN_TYPE_ARRAY,
 		     e_TOKEN_TYPE_FARRAY:
 		{
-			printf("pushing &%d", token[E_TOKEN_INT_VAL]);
 			pushed = Push(token[E_TOKEN_INT_VAL]);
 		}
 		case e_TOKEN_TYPE_STRING:
 		{
-			printf("pushing %s", ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
 			pushed = PushString(ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
 		}
 	}
@@ -582,7 +569,6 @@ static stock Exec_PushOne(tree[][E_TOKEN], entry)
 
 static stock Exec_PushParams(tree[][E_TOKEN], entry)
 {
-	printf("%d %d %d %d %d", _:tree[entry][E_TOKEN_TYPE], _:e_TOKEN_TYPE_OP, _:tree[entry][E_TOKEN_OP], _:e_TOKEN_OP_COMMA, tree[entry][E_TOKEN_TYPE] != e_TOKEN_TYPE_OP || tree[entry][E_TOKEN_OP] != e_TOKEN_OP_COMMA);
 	if (tree[entry][E_TOKEN_TYPE] == e_TOKEN_TYPE_NONE) return 0; // End.
 	else if (tree[entry][E_TOKEN_TYPE] != e_TOKEN_TYPE_OP || tree[entry][E_TOKEN_OP] != e_TOKEN_OP_COMMA)
 	{
@@ -599,7 +585,6 @@ static stock Exec_Evaluate(token[E_TOKEN], tree[][E_TOKEN], entry)
 	new
 		l[E_TOKEN],
 		r[E_TOKEN];
-	//token = EMPTY_PARSER_TOKEN;
 	token = tree[0];
 	if (entry == -1) return;
 	token = tree[entry];
@@ -646,12 +631,10 @@ static stock Exec_Evaluate(token[E_TOKEN], tree[][E_TOKEN], entry)
 			// Function call.
 			new
 				count = Exec_PushParams(tree, token[E_TOKEN_RIGHT]);
-			// printf("Calling with %d params", count);
 			switch (l[E_TOKEN_TYPE])
 			{
 				case e_TOKEN_TYPE_NATIVE:
 				{
-					// printf("Index: %d", l[E_TOKEN_NATIVE_ADDR]);
 					token[E_TOKEN_TYPE] = e_TOKEN_TYPE_INT,
 					token[E_TOKEN_INT_VAL] = SysreqDN(l[E_TOKEN_NATIVE_ADDR], count);
 				}
@@ -667,7 +650,6 @@ static stock Exec_Evaluate(token[E_TOKEN], tree[][E_TOKEN], entry)
 				}
 				default: Parser_Error("Not a pointer.");
 			}
-			// printf("Called");
 			return;
 		}
 	}
