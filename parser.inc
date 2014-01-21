@@ -363,9 +363,8 @@ stock
 static stock Parser_PrintOp(e_TOKEN_OP:op)
 {
 	new
-		none[7];// = "<none>";
+		none[7];
 	if (e_TOKEN_OP_NONE <= op < e_TOKEN_OP)
-	//if (0 <= _:op < sizeof (ISI_gscOpData))
 	{
 		strcat(none, ISI_gscOpData[op][E_OPERATOR_DATA_NAME], 7);
 	}
@@ -408,7 +407,6 @@ static stock Parser_Print(token[E_TOKEN], ret[], len = sizeof (ret))
 		case e_TOKEN_TYPE_OP:     format(ret, len, "OPERATOR: %s", Parser_PrintOp(token[E_TOKEN_OP]));
 		case e_TOKEN_TYPE_APPLY: ret[0] = '\0', strcat(ret, "APPLY", len);
 		case e_TOKEN_TYPE_INDEX: ret[0] = '\0', strcat(ret, "INDEX", len);
-		//case e_TOKEN_TYPE_MD:  ret[0] = '\0', strcat(ret, "INDEX", len);
 		default: ret[0] = '\0', strcat(ret, "<unknown>", len);
 	}
 }
@@ -480,7 +478,7 @@ static stock Parser_GetOp(ret[E_TOKEN])
 	// Should really use a "trie" here, but don't - too complex for now.
 	ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_OP;
 	new
-		len, // = ISI_gInputLen - ISI_gInputPtr,
+		len,
 		p0, p1, p2, p3;
 	// Very special if - uses short-circuiting to always fail eventually...
 	if ((p0 = ISI_gInputLine[ISI_gInputPtr + 0]) &&
@@ -569,7 +567,6 @@ static stock Parser_GetNextToken(ret[E_TOKEN])
 		case '0' .. '9': Parser_GetNumber(ret);
 		case 'a' .. 'z', 'A' .. 'Z', '_', '@':
 		{
-			// printf("%s", ISI_gInputLine[ISI_gInputPtr]);
 			Parser_GetSymbol(ret);
 		}
 		case '"': Parser_GetString(ret);
@@ -607,8 +604,6 @@ static stock Parser_DoHex(ret[E_TOKEN])
 	{
 		num = (num << 4) | cur;
 	}
-	//new
-	//	ret[E_TOKEN] = {e_TOKEN_TYPE_INT, 0};
 	return
 		ret[E_TOKEN_INT_VAL] = num,
 		ISI_gInputPtr = ptr,
@@ -656,8 +651,6 @@ static stock Parser_DoBinary(ret[E_TOKEN])
 	{
 		num = (num << 1) | cur;
 	}
-	//new
-	//	ret[E_TOKEN] = {e_TOKEN_TYPE_INT, 0};
 	return
 		ret[E_TOKEN_INT_VAL] = num,
 		ISI_gInputPtr = ptr,
@@ -684,8 +677,6 @@ static stock Parser_DoOctal(ret[E_TOKEN])
 	{
 		num = (num << 3) | cur;
 	}
-	//new
-	//	ret[E_TOKEN] = {e_TOKEN_TYPE_INT, 0};
 	return
 		ret[E_TOKEN_INT_VAL] = num,
 		ISI_gInputPtr = ptr,
@@ -718,9 +709,6 @@ static stock Parser_DoFloat(ret[E_TOKEN])
 		ndp = 0,
 		dp = 0,
 		parts[3],
-		//numPart1, // Before ".".
-		//numPart2, // After ".".
-		//numPart3, // After "e".
 		ptr = ISI_gInputPtr - 1,
 		ch;
 	for ( ; ; )
@@ -1315,39 +1303,20 @@ stock Parser_BuildTree(prec = cellmin)
 	for ( ; ; )
 	{
 		new
-			// bool:comma = false,
 			p2 = prec;
 		token = Parser_PeekToken();
-		//PrettyPrint(left);
 		switch (token[E_TOKEN_TYPE])
 		{
 			case e_TOKEN_TYPE_NONE: break; // Done.
 			case e_TOKEN_TYPE_OP:
 			{
-				//printf("Cur prec = %d", prec);
-				//printf("%s", Parser_PrintOp(token[E_TOKEN_OP]));
 				if ((p2 = ISI_gscOpData[token[E_TOKEN_OP]][E_OPERATOR_DATA_PRECEDENCE]) <= prec) return left;
-				// switch (token[E_TOKEN_OP])
-				// {
-					// case e_TOKEN_OP_SEMICOLON, e_TOKEN_OP_COMMA: comma = true;
-				// }
 			}
 			default: return Parser_Error("Unexpected token, expected operator.");
 		}
 		new
 			ret = ISI_gParsePos++;
 		Parser_GetNextToken(token); // We only peeked, so pop.
-		// SPECIAL CASE FOR COMMAS.
-		// if (comma && (ISI_gParseTree[left][E_TOKEN_TYPE] != e_TOKEN_TYPE_OP || 
-			// (ISI_gParseTree[left][E_TOKEN_OP] != e_TOKEN_OP_SEMICOLON && ISI_gParseTree[left][E_TOKEN_OP] != e_TOKEN_OP_COMMA)))
-		// {
-			// ISI_gParseTree[ISI_gParsePos][E_TOKEN_LEFT] = 0,
-			// ISI_gParseTree[ISI_gParsePos][E_TOKEN_RIGHT] = left,
-			// ISI_gParseTree[ISI_gParsePos][E_TOKEN_TYPE] = e_TOKEN_TYPE_OP,
-			// ISI_gParseTree[ISI_gParsePos][E_TOKEN_OP] = token[E_TOKEN_OP],
-			// token[E_TOKEN_LEFT] = ISI_gParsePos++;
-		// }
-		// else
 		token[E_TOKEN_LEFT] = left;
 		token[E_TOKEN_RIGHT] = Parser_BuildTree((p2 == 4) ? (p2 - 1) : p2),
 		ISI_gParseTree[ret] = token,
@@ -1453,7 +1422,6 @@ static stock _Parser_PrintToken(str[], size, token[E_TOKEN], bool:bracket)
 		case e_TOKEN_TYPE_APPLY:    strcat(str, "()", size);
 		case e_TOKEN_TYPE_INDEX:    strcat(str, "[]", size);
 		case e_TOKEN_TYPE_SYMBOL: format(str, size, "%s<<<%s>>>", str, ISI_gInputLine[ISI_gsStringTable[token[E_TOKEN_STRING_IDX]]]);
-		// case e_TOKEN_TYPE_MD:     strcat(str, "->", size);
 	}
 }
 
