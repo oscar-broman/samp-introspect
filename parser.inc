@@ -1325,6 +1325,7 @@ stock Parser_BuildTree(prec = cellmin)
 
 stock Parser_SetInput(line[], size = sizeof (line))
 {
+	IntrospectInit();
 	if (size > sizeof (ISI_gInputLine)) return Parser_Error("Insufficient line space.");
 	static
 		blank[sizeof (ISI_gsStringTable)] = {-1, ...},
