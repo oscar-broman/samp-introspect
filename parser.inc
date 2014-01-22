@@ -883,6 +883,12 @@ static stock Parser_GetSymbol(ret[E_TOKEN])
 					ret[E_TOKEN_SYM_PTR] = ref(ISI_gPlayerFlts[ISI_gCurrentPlayer][ch - 'o']);
 					goto Parser_GetSymbol_return;
 				}
+				else if (ch == '@')
+				{
+					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_INT,
+					ret[E_TOKEN_INT_VAL] = ISI_gCurrentPlayer;
+					goto Parser_GetSymbol_return;
+				}
 			}
 		}
 #endif
