@@ -14,6 +14,7 @@
 
 #if !defined INTROSPECT_MAX_TOTAL_ARGS
 	#define INTROSPECT_MAX_TOTAL_ARGS (INTROSPECT_MAX_FUNCTIONS * 4)
+#endif
 
 #if !defined INTROSPECT_MAX_TAGS
 	#define INTROSPECT_MAX_TAGS 512
@@ -61,7 +62,7 @@ enum E_TAG {
 	Name[32]
 }
 
-static
+static stock
 	s_Globals[INTROSPECT_MAX_GLOBALS][E_VARIABLE],
 	s_Arguments[INTROSPECT_MAX_TOTAL_ARGS][E_VARIABLE],
 	s_Functions[INTROSPECT_MAX_FUNCTIONS][E_FUNCTION],
@@ -137,7 +138,7 @@ stock ReadAmxDebugData(File:fp) {
 	s_NumTags = num_tags;
 }
 
-static ReadSymbolTable(File:fp, num_symbols, bool:read_args = false) {
+static stock ReadSymbolTable(File:fp, num_symbols, bool:read_args = false) {
 	for (new i = 0; i < num_symbols; i++) {
 		new address = freadcell(fp);
 		new tag = freadshort(fp);
@@ -221,28 +222,74 @@ static ReadSymbolTable(File:fp, num_symbols, bool:read_args = false) {
 	}
 }
 
-stock GetFunctionInfo(const name[], info[E_FUNCTION]) {
+stock GetFunctionFromAddress(address) {
+	new ret[48];
+	
 	for (new i = 0; i < s_NumFunctions; i++) {
-		if (!strcmp(name, s_Functions[i][Name])) {
-			memcpy(info[E_FUNCTION:0], s_Functions[i][E_FUNCTION:0], 0, _:E_FUNCTION * 4, _:E_FUNCTION);
-			
-			return true;
+		if (address == s_Functions[i][Address]) {
+			strcat(ret, s_Functions[i][Name]);
+			break;
 		}
 	}
 	
-	return false;
+	return ret;
+}
+
+stock GetVariableFromAddress(address) {
+	new ret[32];
+	
+	for (new i = 0; i < s_NumGlobals; i++) {
+		if (address == s_Globals[i][Address]) {
+			strcat(ret, s_Globals[i][Name]);
+			break;
+		}
+	}
+	
+	return ret;
+}
+
+stock GetFunctionIdx(const name[]) {
+	for (new i = 0; i < s_NumFunctions; i++) {
+		if (!strcmp(name, s_Functions[i][Name])) {
+			return i;
+		}
+	}
+	
+	return -1;
+}
+
+stock GetVariableIdx(const name[]) {
+	for (new i = 0; i < s_NumGlobals; i++) {
+		if (!strcmp(name, s_Globals[i][Name])) {
+			return i;
+		}
+	}
+	
+	return -1;
+}
+
+stock GetFunctionInfo(const name[], info[E_FUNCTION]) {
+	new i = GetFunctionIdx(name);
+	
+	if (i == -1) {
+		return false;
+	}
+	
+	memcpy(info[E_FUNCTION:0], s_Functions[i][E_FUNCTION:0], 0, _:E_FUNCTION * 4, _:E_FUNCTION);
+	
+	return true;
 }
 
 stock GetVariableInfo(const name[], info[E_VARIABLE]) {
-	for (new i = 0; i < s_NumGlobals; i++) {
-		if (!strcmp(name, s_Globals[i][Name])) {
-			memcpy(info[E_VARIABLE:0], s_Globals[i][E_VARIABLE:0], 0, _:E_VARIABLE * 4, _:E_VARIABLE);
-			
-			return true;
-		}
+	new i = GetVariableIdx(name);
+	
+	if (i == -1) {
+		return false;
 	}
 	
-	return false;
+	memcpy(info[E_VARIABLE:0], s_Globals[i][E_VARIABLE:0], 0, _:E_VARIABLE * 4, _:E_VARIABLE);
+	
+	return true;
 }
 
 stock GetFunctionArgument(const func_info[E_FUNCTION], idx, info[E_VARIABLE]) {
@@ -261,6 +308,16 @@ stock GetFunctionArgument(const func_info[E_FUNCTION], idx, info[E_VARIABLE]) {
 	memcpy(info[E_VARIABLE:0], s_Arguments[arg][E_VARIABLE:0], 0, _:E_VARIABLE * 4, _:E_VARIABLE);
 	
 	return true;
+}
+
+stock GetTagIdx(const name[]) {
+	for (new i = 0; i < s_NumTags; i++) {
+		if (!strcmp(name, s_Tags[i][Name])) {
+			return s_Tags[i][Tag] | 0xC0000000;
+		}
+	}
+	
+	return -1;
 }
 
 stock GetTagName(tag) {
@@ -356,7 +413,7 @@ stock GetStringFromVariableValue(output[], maxlength = sizeof(output), const inf
 }
 
 // Read a single cell
-static freadcell(File:fp) {
+static stock freadcell(File:fp) {
 	new buf[1];
 	
 	fblockread(fp, buf);
@@ -365,7 +422,7 @@ static freadcell(File:fp) {
 }
 
 // Read a 16-bit integer
-static freadshort(File:fp) {
+static stock freadshort(File:fp) {
 	new buf[1];
 	
 	fblockread(fp, buf);
@@ -375,12 +432,12 @@ static freadshort(File:fp) {
 }
 
 // Read a single byte
-static freadbyte(File:fp) {
+static stock freadbyte(File:fp) {
 	return fgetchar(fp, 0, false);
 }
 
 // Read a zero-terminated string
-static freadstr(File:fp, buf[], maxlength = sizeof(buf)) {
+static stock freadstr(File:fp, buf[], maxlength = sizeof(buf)) {
 	new i = 0, c;
 	
 	buf[i] = '\0';

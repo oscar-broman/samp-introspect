@@ -27,13 +27,20 @@
 	
 	#tryinclude "amx_assembly\dynamic_call"
 	#tryinclude "amx\dynamic_call"
-
+	
+	// We are trying REALLY hard to find this include!
+	#tryinclude "..\amx_assembly\dynamic_call"
+	#tryinclude "..\amx\dynamic_call"
+	
+	#tryinclude <amx_assembly\dynamic_call>
+	#tryinclude <amx\dynamic_call>
+	
 	#if !defined CallNative
-		#error amx_assembly is required. Get it here: github.com/Zeex/amx_assembly
+		#error amx_assembly is required.  Get it here: github.com/Zeex/amx_assembly
 	#endif
 #endif
 
-static const s_AmxName[] = AMX_NAME;
+static stock const s_AmxName[] = AMX_NAME;
 
 stock IntrospectInit() {
 	static s_initialized = false;
@@ -71,10 +78,10 @@ stock IntrospectInit() {
 	
 	fclose(fp);
 	
-	return true;
+	return (s_initialized = true);
 }
 
-static DereferenceArray(addr, dimensions, ...) {
+static stock DereferenceArray(addr, dimensions, ...) {
 	new resolve = numargs() - 3;
 	
 	for (new i = 0; i <= resolve; i++) {
@@ -99,7 +106,7 @@ static DereferenceArray(addr, dimensions, ...) {
 	return addr;
 }
 
-static ReadSymbol(const input[], &index, output[], maxlength = sizeof(output)) {
+static stock ReadSymbol(const input[], &index, output[], maxlength = sizeof(output)) {
 	new i = index, j = 0;
 	
 	if ('0' <= input[i] <= '9') {
@@ -138,7 +145,7 @@ static ReadSymbol(const input[], &index, output[], maxlength = sizeof(output)) {
 	return j;
 }
 
-static ReadString(const input[], &index, output[], maxlength = sizeof(output)) {
+static stock ReadString(const input[], &index, output[], maxlength = sizeof(output)) {
 	new in_esc = false, i = 0, c;
 	
 	for (index++; (c = input[index]); index++) {
@@ -184,7 +191,7 @@ static ReadString(const input[], &index, output[], maxlength = sizeof(output)) {
 	return false;
 }
 
-static ReadNumber(const input[], &index, &output, &type) {
+static stock ReadNumber(const input[], &index, &output, &type) {
 	new i, c, had_num = false;
 	
 	type = 'i';
@@ -238,7 +245,7 @@ static ReadNumber(const input[], &index, &output, &type) {
 	return true;
 }
 
-static ReadArrayIndexes(info[E_VARIABLE], const input[], &index) {
+static stock ReadArrayIndexes(info[E_VARIABLE], const input[], &index) {
 	SkipSpaces(input, index);
 	
 	while (input[index] == '[') {
@@ -274,13 +281,13 @@ static ReadArrayIndexes(info[E_VARIABLE], const input[], &index) {
 	return true;
 }
 
-static SkipSpaces(const buf[], &index) {
+static stock SkipSpaces(const buf[], &index) {
 	while ('\0' < buf[index] <= ' ') {
 		index++;
 	}
 }
 
-static GetVariableAddress(...) {
+static stock GetVariableAddress(...) {
 	#emit LOAD.S.pri 12
 	#emit RETN
 	
