@@ -9,6 +9,30 @@
 
 #include "introspect"
 
+#tryinclude "amx_assembly\amx_header"
+#tryinclude "amx\amx_header"
+#tryinclude "..\amx_assembly\amx_header"
+#tryinclude "..\amx\amx_header"
+
+#tryinclude "amx_assembly\dynamic_call"
+#tryinclude "amx\dynamic_call"
+#tryinclude "..\amx_assembly\dynamic_call"
+#tryinclude "..\amx\dynamic_call"
+
+#tryinclude "amx_assembly/amx_header"
+#tryinclude "amx/amx_header"
+#tryinclude "../amx_assembly/amx_header"
+#tryinclude "../amx/amx_header"
+
+#tryinclude "amx_assembly/dynamic_call"
+#tryinclude "amx/dynamic_call"
+#tryinclude "../amx_assembly/dynamic_call"
+#tryinclude "../amx/dynamic_call"
+
+#if !defined CallNative || !defined SysreqCN
+	#error amx_assembly is required. Get it here: github.com/Zeex/amx_assembly
+#endif
+
 enum e_TOKEN_OP
 {
 	e_TOKEN_OP_NONE,
