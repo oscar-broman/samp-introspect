@@ -22,18 +22,14 @@ stock RunExpression(line[], size = sizeof (line), as = -1)
 {
 	new
 		ret[E_TOKEN] = EMPTY_PARSER_TOKEN;
-#if defined INTROSPECT_PLAYER_DATA
 	Parser_SetPlayer(as);
-#endif
 	if (Parser_SetInput(line, size))
 	{
 		new
 			parse = Parser_BuildTree();
 		Exec_Evaluate(ret, ISI_gParseTree, parse);
 	}
-#if defined INTROSPECT_PLAYER_DATA
 	Parser_SetPlayer(-1);
-#endif
 	return ret;
 }
 

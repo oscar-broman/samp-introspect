@@ -9,28 +9,35 @@
 
 #include "introspect"
 
+#if !defined ref
+	#error amx_assembly is required. Get it here: github.com/Zeex/amx_assembly
+#endif
+
 #tryinclude "amx_assembly\amx_header"
 #tryinclude "amx\amx_header"
 #tryinclude "..\amx_assembly\amx_header"
 #tryinclude "..\amx\amx_header"
+#tryinclude <amx_assembly\amx_header>
+#tryinclude <amx\amx_header>
 
 #tryinclude "amx_assembly\dynamic_call"
 #tryinclude "amx\dynamic_call"
 #tryinclude "..\amx_assembly\dynamic_call"
 #tryinclude "..\amx\dynamic_call"
+#tryinclude <amx_assembly\dynamic_call>
+#tryinclude <amx\dynamic_call>
 
-#tryinclude "amx_assembly/amx_header"
-#tryinclude "amx/amx_header"
-#tryinclude "../amx_assembly/amx_header"
-#tryinclude "../amx/amx_header"
+#if !defined SysreqCN
+	#error amx_assembly is required.  Get it here: github.com/Zeex/amx_assembly
+#endif
 
-#tryinclude "amx_assembly/dynamic_call"
-#tryinclude "amx/dynamic_call"
-#tryinclude "../amx_assembly/dynamic_call"
-#tryinclude "../amx/dynamic_call"
-
-#if !defined CallNative || !defined SysreqCN
-	#error amx_assembly is required. Get it here: github.com/Zeex/amx_assembly
+#if defined INTROSPECT_LAMBDA
+	#tryinclude "..\YSI_Coding\y_inline"
+	#tryinclude <YSI_Coding\y_inline>
+	
+	#if !defined YSI_MAX_INLINE_STRING
+		#error YSI 4.0 is required.  Get it here: github.com/Y-Less/YSI-Includes/tree/YSI.tl
+	#endif
 #endif
 
 enum e_TOKEN_OP
@@ -239,20 +246,34 @@ stock
 		ISI_gPlayerStrM[MAX_PLAYERS][144], // m
 		ISI_gPlayerStrN[MAX_PLAYERS][144], // n
 		ISI_gPlayerFlts[MAX_PLAYERS][12];  // o - z
-	
-	stock Parser_SetPlayer(pid)
+#endif
+
+static stock
+	ISI_gNoPlayerInts[12],  // a - l
+	ISI_gNoPlayerStrM[144], // m
+	ISI_gNoPlayerStrN[144], // n
+	ISI_gNoPlayerFlts[12];  // o - z
+
+stock Parser_SetPlayer(pid)
+{
+#if defined INTROSPECT_PLAYER_DATA
+	if ((ISI_gCurrentPlayer = pid) == -1)
 	{
-		if ((ISI_gCurrentPlayer = pid) == -1)
-		{
-			state Parser_Error_state : Parser_Error_print;
-		}
-		else
-		{
-			state Parser_Error_state : Parser_Error_player;
-		}
+		state Parser_Error_state : Parser_Error_print;
 	}
-	
-	static stock Parser_GetLocalName(ptr)
+	else
+	{
+		state Parser_Error_state : Parser_Error_player;
+	}
+#else
+	#pragma unused pid
+#endif
+}
+
+static stock Parser_GetLocalName(ptr)
+{
+#if defined INTROSPECT_PLAYER_DATA
+	if (IsPlayerConnected(ISI_gCurrentPlayer))
 	{
 		new
 			sInts = -1,
@@ -279,17 +300,51 @@ stock
 		{
 			return 'o' + (ptr - sFlts) / 4;
 		}
-		return '-';
 	}
-	
-	forward _@_ParserFuncs();
-	
-	public _@_ParserFuncs()
+	else
+#endif
 	{
-		printf("");
-		format("", 0, "");
+		static
+			sInts = -1,
+			sStrM,
+			sStrN,
+			sFlts;
+		if (sInts == -1)
+		{
+			sInts = ref(ISI_gNoPlayerInts),
+			sStrM = ref(ISI_gNoPlayerStrM),
+			sStrN = ref(ISI_gNoPlayerStrN),
+			sFlts = ref(ISI_gNoPlayerFlts);
+		}
+		if (sInts <= ptr < sInts + 12 * 4)
+		{
+			return 'a' + (ptr - sInts) / 4;
+		}
+		else if (sStrM <= ptr < sStrM + 144 * 4)
+		{
+			return 'm';
+		}
+		else if (sStrN <= ptr < sStrN + 144 * 4)
+		{
+			return 'n';
+		}
+		else if (sFlts <= ptr < sFlts + 12 * 4)
+		{
+			return 'o' + (ptr - sFlts) / 4;
+		}
 	}
-	
+	return '-';
+}
+
+forward _@_ParserFuncs();
+
+public _@_ParserFuncs()
+{
+	printf("");
+	format("", 0, "");
+}
+
+#if defined INTROSPECT_PLAYER_DATA
 	stock _Parser_Msg(const str[], ...) <Parser_Error_state : Parser_Error_player>
 	{
 		static
@@ -393,13 +448,10 @@ static stock Parser_Print(token[E_TOKEN], ret[], len = sizeof (ret))
 			format(ret, len, "FUNCTION: %s", GetFunctionFromAddress(token[E_TOKEN_FUNC_PTR]));
 		case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_FVAR, e_TOKEN_TYPE_ARRAY, e_TOKEN_TYPE_FARRAY:
 		{
-#if defined INTROSPECT_PLAYER_DATA
 			new
 				ch = Parser_GetLocalName(token[E_TOKEN_SYM_PTR]);
-			if (ch != '-') format(ret, len, "LOCAL: %c", ch);
-			else
-#endif
-				format(ret, len, "VARIABLE: %s", GetVariableFromAddress(token[E_TOKEN_SYM_PTR]));
+			if (ch == '-') format(ret, len, "VARIABLE: %s", GetVariableFromAddress(token[E_TOKEN_SYM_PTR]));
+			else format(ret, len, "LOCAL: %c", ch);
 		}
 		case e_TOKEN_TYPE_FLOAT:  format(ret, len, "FLOAT:    %.2f", token[E_TOKEN_FLOAT_VAL]);
 		case e_TOKEN_TYPE_INT:    format(ret, len, "NUMBER:   %d", token[E_TOKEN_INT_VAL]);
@@ -855,9 +907,10 @@ static stock Parser_GetSymbol(ret[E_TOKEN])
 		{
 			ISI_gFloatTagIndex = GetTagIdx("Float");
 		}
-#if defined INTROSPECT_PLAYER_DATA
+		if (ptr - ISI_gInputPtr == 1)
 		{
-			if (ptr - ISI_gInputPtr == 1 && IsPlayerConnected(ISI_gCurrentPlayer))
+#if defined INTROSPECT_PLAYER_DATA
+			if (IsPlayerConnected(ISI_gCurrentPlayer))
 			{
 				new
 					ch = ISI_gInputLine[ISI_gInputPtr];
@@ -892,8 +945,40 @@ static stock Parser_GetSymbol(ret[E_TOKEN])
 					goto Parser_GetSymbol_return;
 				}
 			}
-		}
+			else
 #endif
+			{
+				// No player, use default locals.
+				new
+					ch = ISI_gInputLine[ISI_gInputPtr];
+				if ('a' <= ch <= 'l')
+				{
+					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_VAR,
+					ret[E_TOKEN_SYM_PTR] = ref(ISI_gNoPlayerInts[ch - 'a']);
+					goto Parser_GetSymbol_return;
+				}
+				else if (ch == 'm')
+				{
+					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARRAY | (e_TOKEN_TYPE:1 << TOKEN_TYPE_SHIFT),
+					ret[E_TOKEN_SYM_PTR] = ref(ISI_gNoPlayerStrM[0]);
+					goto Parser_GetSymbol_return;
+				}
+				else if (ch == 'n')
+				{
+					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_ARRAY | (e_TOKEN_TYPE:1 << TOKEN_TYPE_SHIFT),
+					ret[E_TOKEN_SYM_PTR] = ref(ISI_gNoPlayerStrN[0]);
+					goto Parser_GetSymbol_return;
+				}
+				else if ('o' <= ch <= 'z')
+				{
+					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_FVAR,
+					ret[E_TOKEN_SYM_PTR] = ref(ISI_gNoPlayerFlts[ch - 'o']);
+					goto Parser_GetSymbol_return;
+				}
+				// '@' is undefined for no players.
+			}
+		}
+
 		{
 			// See if this symbol is an array/variable.
 			new
@@ -1413,13 +1498,10 @@ static stock _Parser_PrintToken(str[], size, token[E_TOKEN], bool:bracket)
 			strcat(str, GetFunctionFromAddress(token[E_TOKEN_FUNC_PTR]), size);
 		case e_TOKEN_TYPE_VAR, e_TOKEN_TYPE_FVAR, e_TOKEN_TYPE_ARRAY, e_TOKEN_TYPE_FARRAY:
 		{
-#if defined INTROSPECT_PLAYER_DATA
 			new
 				ch = Parser_GetLocalName(token[E_TOKEN_SYM_PTR]);
-			if (ch != '-') format(str, size, "%s%c", str, ch);
-			else
-#endif
-				strcat(str, GetVariableFromAddress(token[E_TOKEN_SYM_PTR]), size);
+			if (ch == '-') strcat(str, GetVariableFromAddress(token[E_TOKEN_SYM_PTR]), size);
+			else format(str, size, "%s%c", str, ch);
 		}
 		case e_TOKEN_TYPE_INT:    format(str, size, "%s%d",     str, token[E_TOKEN_INT_VAL]);
 		case e_TOKEN_TYPE_BOOL:   strcat(str, (token[E_TOKEN_BOOL_VAL]) ? ("true") : ("false"), size);
