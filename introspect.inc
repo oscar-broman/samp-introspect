@@ -25,18 +25,28 @@
 #if defined INTROSPECT_NATIVES
 	#include "introspect-natives"
 	
-	#tryinclude "amx_assembly\dynamic_call"
-	#tryinclude "amx\dynamic_call"
+  #tryinclude "amx_assembly\amx_header"
+  #tryinclude "amx\amx_header"
+  #tryinclude "..\amx_assembly\amx_header"
+  #tryinclude "..\amx\amx_header"
+
+  #tryinclude "amx_assembly\dynamic_call"
+  #tryinclude "amx\dynamic_call"
+  #tryinclude "..\amx_assembly\dynamic_call"
+  #tryinclude "..\amx\dynamic_call"
+
+  #tryinclude "amx_assembly/amx_header"
+  #tryinclude "amx/amx_header"
+  #tryinclude "../amx_assembly/amx_header"
+  #tryinclude "../amx/amx_header"
+
+  #tryinclude "amx_assembly/dynamic_call"
+  #tryinclude "amx/dynamic_call"
+  #tryinclude "../amx_assembly/dynamic_call"
+  #tryinclude "../amx/dynamic_call"
 	
-	// We are trying REALLY hard to find this include!
-	#tryinclude "..\amx_assembly\dynamic_call"
-	#tryinclude "..\amx\dynamic_call"
-	
-	#tryinclude <amx_assembly\dynamic_call>
-	#tryinclude <amx\dynamic_call>
-	
-	#if !defined CallNative
-		#error amx_assembly is required.  Get it here: github.com/Zeex/amx_assembly
+	#if !defined CallNative || !defined SysreqCN
+		#error amx_assembly is required. Get it here: github.com/Zeex/amx_assembly
 	#endif
 #endif
 
