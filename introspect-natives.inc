@@ -1,5 +1,7 @@
 #include <a_samp>
-#include <a_http>
+#if !defined HTTP
+	#include <a_http>
+#endif
 
 forward _@_introspect_funcinc();
 public _@_introspect_funcinc() {
