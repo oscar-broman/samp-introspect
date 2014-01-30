@@ -9,28 +9,6 @@
 
 #include "introspect"
 
-#if !defined ref
-	#error amx_assembly is required. Get it here: github.com/Zeex/amx_assembly
-#endif
-
-#tryinclude "amx_assembly\amx_header"
-#tryinclude "amx\amx_header"
-#tryinclude "..\amx_assembly\amx_header"
-#tryinclude "..\amx\amx_header"
-#tryinclude <amx_assembly\amx_header>
-#tryinclude <amx\amx_header>
-
-#tryinclude "amx_assembly\dynamic_call"
-#tryinclude "amx\dynamic_call"
-#tryinclude "..\amx_assembly\dynamic_call"
-#tryinclude "..\amx\dynamic_call"
-#tryinclude <amx_assembly\dynamic_call>
-#tryinclude <amx\dynamic_call>
-
-#if !defined SysreqCN
-	#error amx_assembly is required.  Get it here: github.com/Zeex/amx_assembly
-#endif
-
 #if defined INTROSPECT_LAMBDA
 	#tryinclude "..\YSI_Coding\y_inline"
 	#tryinclude <YSI_Coding\y_inline>
