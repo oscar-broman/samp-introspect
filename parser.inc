@@ -11,7 +11,9 @@
 
 #if defined INTROSPECT_LAMBDA
 	#tryinclude "..\YSI_Coding\y_inline"
-	#tryinclude <YSI_Coding\y_inline>
+	#tryinclude "YSI_Coding\y_inline"
+	#tryinclude "../YSI_Coding/y_inline"
+	#tryinclude "YSI_Coding/y_inline"
 	
 	#if !defined YSI_MAX_INLINE_STRING
 		#error YSI 4.0 is required.  Get it here: github.com/Y-Less/YSI-Includes/tree/YSI.tl
