@@ -1,7 +1,8 @@
 #include "parser"
 
 static stock
-	gArrayLookup[32][3]; // Pointer, max indices, current index.
+	ISI_gHeap[128],
+	ISI_gHeapPtr = -1;
 
 static stock const
 	_EXEC_TAG_MISMATCH[] = "PARSER WARNING: Tag mismatch.",
@@ -22,6 +23,7 @@ stock RunExpression(line[], size = sizeof (line), as = -1)
 {
 	new
 		ret[E_TOKEN] = EMPTY_PARSER_TOKEN;
+	ISI_gHeapPtr = -1;
 	Parser_SetPlayer(as);
 	if (Parser_SetInput(line, size))
 	{
@@ -201,6 +203,22 @@ static stock e_TOKEN_TYPE:Exec_ResolveInt(const l[E_TOKEN], const r[E_TOKEN], &l
 	return ret;
 }
 
+static stock Exec_ToHeap(value)
+{
+	static
+		sNullDest;
+	if (++ISI_gHeapPtr == sizeof (ISI_gHeap))
+	{
+		Parser_Error("Heap overflow.");
+		return ref(sNullDest);
+	}
+	else
+	{
+		ISI_gHeap[ISI_gHeapPtr] = value;
+		return ref(ISI_gHeap[ISI_gHeapPtr]);
+	}
+}
+
 #define EXEC_OP(%0\32;%9\32;%1,%7) switch(Exec_ResolveTags(%0,%1,lr,rr)) { \
 	case e_TOKEN_TYPE_FLOAT:ret[E_TOKEN_TYPE]=e_TOKEN_TYPE_FLOAT,ret[E_TOKEN_FLOAT_VAL]=%7((Float:lr),(Float:rr)); \
 	case e_TOKEN_TYPE_INT:ret[E_TOKEN_TYPE]=e_TOKEN_TYPE_INT,ret[E_TOKEN_INT_VAL]=lr%9rr; \
@@ -374,9 +392,9 @@ static stock Exec_ExecToken(const t[E_TOKEN], const l[E_TOKEN], const r[E_TOKEN]
 				EXEC_INT(l & r)
 			case e_TOKEN_OP_REF : switch (r[E_TOKEN_TYPE]) // PREFIX '&'
 			{
-				case e_TOKEN_TYPE_INT  : TODO: Store data and take reference.
-				case e_TOKEN_TYPE_BOOL : TODO: Store data and take reference.
-				case e_TOKEN_TYPE_FLOAT: TODO: Store data and take reference.
+				case e_TOKEN_TYPE_INT, e_TOKEN_TYPE_BOOL, e_TOKEN_TYPE_FLOAT:
+					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_INT,
+					ret[E_TOKEN_INT_VAL] = Exec_ToHeap(r[E_TOKEN_INT_VAL]);
 				case e_TOKEN_TYPE_FVAR, e_TOKEN_TYPE_VAR:
 					// Store the pointer as a number.
 					ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_INT,

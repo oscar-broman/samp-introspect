@@ -344,57 +344,57 @@ public _@_ParserFuncs()
 	format("", 0, "");
 }
 
+stock _Parser_Msg(const str[], ...) <Parser_Error_state : Parser_Error_player>
+{
+	static
+		dest[144],
+		sPar,
+		sRet,
+		sFrm;
+	// Save the header.
+	#emit LOAD.S.pri 0
+	#emit STOR.pri   sFrm
+	#emit LOAD.S.pri 4
+	#emit STOR.pri   sRet
+	#emit LOAD.S.pri 8
+	#emit STOR.pri   sPar
+	// Push the size.
+	#emit CONST.alt  144
+	#emit STOR.S.alt 8
+	// Push the destination.
+	#emit CONST.alt  dest
+	#emit STOR.S.alt 4
+	// Update the parameter count.
+	#emit ADD.C      8
+	#emit STOR.S.pri 0
+	// Call the function.
+	#emit SYSREQ.C   format
+	// Restore the header.
+	#emit LOAD.pri   sFrm
+	#emit STOR.S.pri 0
+	#emit LOAD.pri   sRet
+	#emit STOR.S.pri 4
+	#emit LOAD.pri   sPar
+	#emit STOR.S.pri 8
+	return SendClientMessage(ISI_gCurrentPlayer, (str[7] == 'E') ? 0xCD2626FF : 0xFFD700FF, dest);
+}
+
+stock _Parser_Msg(const str[], {Float,_}:...) <Parser_Error_state : Parser_Error_print>
+{
+	#pragma unused str
+	#emit STACK        8
+	#emit SYSREQ.C     printf
+	#emit STACK        0xFFFFFFF8
+	#emit RETN
+	return 0;
+}
+
 #if defined INTROSPECT_PLAYER_DATA
-	stock _Parser_Msg(const str[], ...) <Parser_Error_state : Parser_Error_player>
-	{
-		static
-			dest[144],
-			sPar,
-			sRet,
-			sFrm;
-		// Save the header.
-		#emit LOAD.S.pri 0
-		#emit STOR.pri   sFrm
-		#emit LOAD.S.pri 4
-		#emit STOR.pri   sRet
-		#emit LOAD.S.pri 8
-		#emit STOR.pri   sPar
-		// Push the size.
-		#emit CONST.alt  144
-		#emit STOR.S.alt 8
-		// Push the destination.
-		#emit CONST.alt  dest
-		#emit STOR.S.alt 4
-		// Update the parameter count.
-		#emit ADD.C      8
-		#emit STOR.S.pri 0
-		// Call the function.
-		#emit SYSREQ.C   format
-		// Restore the header.
-		#emit LOAD.pri   sFrm
-		#emit STOR.S.pri 0
-		#emit LOAD.pri   sRet
-		#emit STOR.S.pri 4
-		#emit LOAD.pri   sPar
-		#emit STOR.S.pri 8
-		return SendClientMessage(ISI_gCurrentPlayer, (str[7] == 'E') ? 0xCD2626FF : 0xFFD700FF, dest);
-	}
-	
-	stock _Parser_Msg(const str[], {Float,_}:...) <Parser_Error_state : Parser_Error_print>
-	{
-		#pragma unused str
-		#emit STACK        8
-		#emit SYSREQ.C     printf
-		#emit STACK        0xFFFFFFF8
-		#emit RETN
-		return 0;
-	}
-	
 	#define Parser_Error(%0) _Parser_Msg("PARSER ERROR  : " %0)
 	#define Parser_Warning(%0) _Parser_Msg("PARSER WARNING: " %0)
 #else
-	#define Parser_Error(%0) print("PARSER ERROR  : " %0)
-	#define Parser_Warning(%0) print("PARSER WARNING: " %0)
+	#define Parser_Error(%0) printf("PARSER ERROR  : " %0)
+	#define Parser_Warning(%0) printf("PARSER WARNING: " %0)
 #endif
 
 /******************************************************************************\
