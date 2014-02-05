@@ -651,7 +651,7 @@ static stock Exec_Evaluate(token[E_TOKEN], tree[][E_TOKEN], entry)
 				case e_TOKEN_TYPE_NATIVE:
 				{
 					token[E_TOKEN_TYPE] = e_TOKEN_TYPE_INT,
-					token[E_TOKEN_INT_VAL] = SysreqDN(l[E_TOKEN_NATIVE_ADDR], count);
+					token[E_TOKEN_INT_VAL] = SysreqCN(l[E_TOKEN_NATIVE_IDX], count);
 				}
 				case e_TOKEN_TYPE_FUNC:
 				{

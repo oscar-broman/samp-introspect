@@ -118,7 +118,7 @@ enum E_TOKEN
 	e_TOKEN_OP:E_TOKEN_OP = 1,
 	E_TOKEN_SYM_PTR = 1,
 	E_TOKEN_STRING_IDX = 1,
-	E_TOKEN_NATIVE_ADDR = 1,
+	E_TOKEN_NATIVE_IDX = 1,
 	E_TOKEN_FUNC_PTR = 1,
 	E_TOKEN_LEFT,
 	E_TOKEN_RIGHT,
@@ -419,7 +419,7 @@ static stock Parser_Print(token[E_TOKEN], ret[], len = sizeof (ret))
 		case e_TOKEN_TYPE_NATIVE:
 		{
 			new name[32];
-			GetNativeNameFromAddress(token[E_TOKEN_NATIVE_ADDR], name);
+			GetNativeNameFromIndex(token[E_TOKEN_NATIVE_IDX], name);
 			format(ret, len, "NATIVE:   %s", name);
 		}
 		case e_TOKEN_TYPE_SYMBOL:
@@ -998,11 +998,11 @@ static stock Parser_GetSymbol(ret[E_TOKEN])
 		{
 			// See if this symbol is a native function.
 			new
-				info = GetNativeAddressFromName(ISI_gInputLine[ISI_gInputPtr]);
+				info = GetNativeIndexFromName(ISI_gInputLine[ISI_gInputPtr]);
 			if (info != -1)
 			{
 				ret[E_TOKEN_TYPE] = e_TOKEN_TYPE_NATIVE,
-				ret[E_TOKEN_NATIVE_ADDR] = info;
+				ret[E_TOKEN_NATIVE_IDX] = info;
 				goto Parser_GetSymbol_return;
 			}
 		}
@@ -1471,7 +1471,7 @@ static stock _Parser_PrintToken(str[], size, token[E_TOKEN], bool:bracket)
 		case e_TOKEN_TYPE_NATIVE:
 		{
 			new name[32];
-			GetNativeNameFromIndex(token[E_TOKEN_NATIVE_ADDR], name);
+			GetNativeNameFromIndex(token[E_TOKEN_NATIVE_IDX], name);
 			strcat(str, name, size);
 		}
 		case e_TOKEN_TYPE_FUNC, e_TOKEN_TYPE_FFUNC:
